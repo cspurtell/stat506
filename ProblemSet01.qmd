@@ -1,6 +1,20 @@
-##### Problem 1 #####
+---
+title: "Purtell_ProblemSet01"
+author: "Colin Purtell"
+format:
+  html: 
+    embed-resources: true
+    standalone: true
+editor: visual
+---
 
-### a. ###
+## STATS 506 Problem Set 1:
+
+### Problem 1
+
+#### a.
+
+```{r}
 abalones <- read.csv("data/abalone.data")
 colnames(abalones) <- c("Sex", 
                         "Length", 
@@ -11,94 +25,94 @@ colnames(abalones) <- c("Sex",
                         "Viscera.weight",
                         "Shell.weight",
                         "Rings")
+```
 
+#### b.
 
-### b. ###
+```{r}
 table(abalones$Sex)
-# F    I    M 
-# 1307 1342 1527
+```
 
+According to the table, there are 1307 female abalones, 1342 infants, and 1527 males.
 
-### c. ###
-weights <- abalones[, c("Whole.weight", "Shucked.weight", "Viscera.weight", "Shell.weight", "Rings")]
+#### c. 
+
+```{r}
+weights <- abalones[, c("Whole.weight", "Shucked.weight", "Viscera.weight", 
+                        "Shell.weight", "Rings")]
 cor(weights)
-# It appears that shell weight has the highest correlation with rings
+```
 
+It appears that shell weight has the highest correlation with number of rings.
+
+```{r}
 abs_m <- subset(abalones, Sex == "M")
 abs_f <- subset(abalones, Sex == "F")
 abs_i <- subset(abalones, Sex == "I")
-cor(abs_m$Shell.weight, abs_m$Rings) #0.5124437
-cor(abs_f$Shell.weight, abs_f$Rings) #0.405907
-cor(abs_i$Shell.weight, abs_i$Rings) #0.7254357
-# It appears that for shell weight, infant has the highest correlation with rings
+cor(abs_m$Shell.weight, abs_m$Rings)
+cor(abs_f$Shell.weight, abs_f$Rings)
+cor(abs_i$Shell.weight, abs_i$Rings)
+```
 
+When looking only at shell weight, it appears that the infant designation has the highest correlation with number of rings.
+
+```{r}
 oldest <- subset(abalones, Rings == max(abalones$Rings))
 oldest[, c("Whole.weight", "Shucked.weight", "Viscera.weight", "Shell.weight")]
-# Whole.weight  Shucked.weight  Viscera.weight  Shell.weight
-# 1.8075        0.7055          0.3215          0.475
+```
 
+The abalone with the most rings is found in observation 480, with a whole weight of 1.8075, a shucked weight of 0.7055, a viscera weight of 0.3215, and a shell weight of 0.475.
+
+```{r}
 abalones$Is.larger <- abalones$Viscera.weight > abalones$Shell.weight
 count_larger <- sum(abalones$Is.larger)
 (count_larger / nrow(abalones)) * 100
-# 6.51341% have a viscera weight larger than their shell weight
+```
 
+Approximately 6.51341% of abalones have a viscera weight larger than their shell weight.
 
-### d. ###
+#### d.
+
+```{r}
 weights <- c("Whole.weight", "Shucked.weight", "Viscera.weight", "Shell.weight")
-abs_split <- split(abalones, abalones$Sex) #Splits into three separate data frames by sex
-cor_table <- sapply(abs_split, function(sub) { #Applies function to each sub data frame
-  sapply(sub[weights], function(x) cor(x, sub$Rings)) #Calculates the correlation values for each weight column
-})
+abs_split <- split(abalones, abalones$Sex) #Splits into three separate data frames                                             by sex
+cor_table <- sapply(abs_split, function(sub) {
+  sapply(sub[weights], function(x) cor(x, sub$Rings))})
 cor_table <- t(cor_table) #Makes rows the sexes
 cor_table <- data.frame(Sex = rownames(cor_table), cor_table, row.names = NULL)
 cor_table
+```
 
+#### e.
 
-### e. ###
+```{r}
+#Testing for difference between male and female abalones
 t.test(abalones$Rings[abalones$Sex == "M"], abalones$Rings[abalones$Sex == "F"])
-# Welch Two Sample t-test
-# 
-# data:  abalones$Rings[abalones$Sex == "M"] and abalones$Rings[abalones$Sex == "F"]
-# t = -3.69, df = 2741.8, p-value = 0.0002286
-# alternative hypothesis: true difference in means is not equal to 0
-# 95 percent confidence interval:
-#   -0.6533201 -0.1999174
-# sample estimates:
-# mean of x   mean of y 
-# 10.70269    11.12930
+```
 
+```{r}
+#Testing for difference between male and infant abalones
 t.test(abalones$Rings[abalones$Sex == "M"], abalones$Rings[abalones$Sex == "I"])
-# Welch Two Sample t-test
-#
-# data:  abalones$Rings[abalones$Sex == "M"] and abalones$Rings[abalones$Sex == "I"]
-# t = 27.194, df = 2857.9, p-value < 2.2e-16
-# alternative hypothesis: true difference in means is not equal to 0
-# 95 percent confidence interval:
-#   2.609451 3.014995
-# sample estimates:
-# mean of x   mean of y 
-# 10.702685   7.890462
+```
 
+```{r}
+#Testing for difference between female and infant abalones
 t.test(abalones$Rings[abalones$Sex == "F"], abalones$Rings[abalones$Sex == "I"])
-# Welch Two Sample t-test
-# 
-# data:  abalones$Rings[abalones$Sex == "F"] and abalones$Rings[abalones$Sex == "I"]
-# t = 29.477, df = 2508.9, p-value < 2.2e-16
-# alternative hypothesis: true difference in means is not equal to 0
-# 95 percent confidence interval:
-#   3.023380 3.454304
-# sample estimates:
-# mean of x   mean of y 
-# 11.129304   7.890462
+```
 
+The three t-tests show significant differences in mean number of rings across all sex groups, as their p-values all fall below any reasonable threshold.
 
-##### Problem 2 #####
+### Problem 2
 
-### a. ###
+#### a.
+
+```{r}
 food_exp <- read.csv("data/food_expenditure.csv")
+```
 
+#### b.
 
-### b. ###
+```{r}
 colnames(food_exp) <- c("ID",
                         "age",
                         "household_size",
@@ -111,48 +125,71 @@ colnames(food_exp) <- c("ID",
                         "times_dined",
                         "alcohol_included",
                         "assistance_programs")
+```
 
+#### c.
 
-### c. ###
+```{r}
 food_usd <- food_exp[food_exp$currency == "USD", ]
 cat("Before restriction: ", nrow(food_exp), " observations\n")
 cat("After restriction: ", nrow(food_usd), " observations\n")
+```
 
+We can observe that the filtering was successful, as the new dataset contains 230 out of the original 262 observations.
 
-### d. ###
+#### d.
+
+```{r}
 food_exp <- food_exp[food_exp$age >= 18 & food_exp$age <= 100, ]
-# Excluded all minors as they are unlikely to be responsible for food spending, as well as implausible ages
+```
 
+Excluded all minors as they are unlikely to be responsible for food spending, as well as implausible ages.
 
-### e. ###
+#### e.
+
+```{r}
 valid_states <- state.abb #Pre-made vector of all 50 U.S states
 valid_states <- c(valid_states, "DC")
 food_exp <- food_exp[food_exp$state %in% valid_states, ]
-# Removed invalid or missing entries for state name abbreviations
+```
 
+Removed invalid or missing entries for state name abbreviations (a.k.a anything that isn't one of the 50 U.S states plus Washington D.C)
 
-### f. ###
+#### f.
+
+```{r}
 food_exp <- food_exp[!is.na(food_exp$total_expenditure) & food_exp$total_expenditure >= 0, ]
 food_exp <- food_exp[is.na(food_exp$grocery_expenditure) | (food_exp$grocery_expenditure >= 0), ]
 food_exp <- food_exp[is.na(food_exp$dining_expenditure) | (food_exp$dining_expenditure >= 0), ]
 food_exp <- food_exp[is.na(food_exp$misc_expenditure) | (food_exp$misc_expenditure >= 0), ]
-# Removed all instances of negative and missing values for total expenditure, but allowed NA to be a valid response for any of the subcategories/types of expenditures
+```
 
+Removed all instances of negative and missing values for total expenditure, but allowed NA to be a valid response for any of the subcategories/types of expenditures, as it is possible for those surveyed to have not spent any money in a particular area.
 
-### g. ###
+#### g.
+
+```{r}
 food_exp <- food_exp[
   (food_exp$times_dined > 0 & (is.na(food_exp$dining_expenditure) | food_exp$dining_expenditure >= 0)) |
   (food_exp$times_dined == 0 & (is.na(food_exp$dining_expenditure) | food_exp$dining_expenditure == 0)),
 ]
-# Removed inconsistent/implausible responses between number of reported times dined out and dining expenditures
+```
 
+Removed any inconsistent/implausible responses between number of reported times dined out and dining expenditures (ex. cannot have possibly dined out 0 times but still spent \$13 on expenditures when dining out).
 
-### h. ###
+#### h.
+
+```{r}
 nrow(food_exp)
-# 181 rows
+```
 
+After filtering out observations based on the above criteria, the dataset has 173 remaining observations.
 
-##### Problem 3 #####
+### Problem 3
+
+#### a.
+
+```{r}
 #' Compute the next number in the Collatz sequence
 #' 
 #' @param n A positive number
@@ -168,14 +205,19 @@ nextCollatz <- function(n) {
     return(3 * n + 1)
   }
 }
+```
 
+```{r}
 nextCollatz(5)
-# [1] 16
+```
+
+```{r}
 nextCollatz(16)
-# [1] 8
+```
 
+#### b.
 
-### b. ###
+```{r}
 #' Compute the full Collatz sequence for a given integer
 #' 
 #' @param n A positive integer
@@ -197,23 +239,19 @@ collatzSequence <- function(n) {
     length = length(seq_vec)
   ))
 }
+```
 
+```{r}
 collatzSequence(5)
-# $sequence
-# [1]  5 16  8  4  2  1
+```
 
-# $length
-# [1] 6
-
+```{r}
 collatzSequence(19)
-# $sequence
-# [1] 19 58 29 88 44 22 11 34 17 52 26 13 40 20 10  5 16  8  4  2  1
+```
 
-# $length
-# [1] 21
+#### c.
 
-
-### c. ###
+```{r}
 values <- 100:500
 seq_lengths <- sapply(values, function(x) collatzSequence(x)$length)
 min_len <- min(seq_lengths)
@@ -222,8 +260,9 @@ max_len <- max(seq_lengths)
 longest_start <- values[which(seq_lengths == max_len)[1]]  # lowest start in case of tie
 
 cat("Shortest Collatz sequence starts at", shortest_start, "with length", min_len, "\n")
-# Shortest Collatz sequence starts at 128 with length 8
 cat("Longest Collatz sequence starts at", longest_start, "with length", max_len, "\n")
-# Longest Collatz sequence starts at 327 with length 144
+```
 
-#Resources used: R documentation for subset(), split(), and cat() functions, Stack Overflow for Collatz function help, ChatGPT for debugging
+### Resources Used:
+
+R documentation for subset(), split(), and cat() functions, StackOverflow for nextCollatz function help, ChatGPT for debugging purposes
