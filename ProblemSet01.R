@@ -53,6 +53,7 @@ cor_table <- t(cor_table) #Makes rows the sexes
 cor_table <- data.frame(Sex = rownames(cor_table), cor_table, row.names = NULL)
 cor_table
 
+
 ### e. ###
 t.test(abalones$Rings[abalones$Sex == "M"], abalones$Rings[abalones$Sex == "F"])
 # Welch Two Sample t-test
@@ -91,16 +92,132 @@ t.test(abalones$Rings[abalones$Sex == "F"], abalones$Rings[abalones$Sex == "I"])
 # 11.129304   7.890462
 
 
+##### Problem 2 #####
+
+### a. ###
+food_exp <- read.csv("data/food_expenditure.csv")
+
+
+### b. ###
+colnames(food_exp) <- c("ID",
+                        "age",
+                        "household_size",
+                        "state",
+                        "currency",
+                        "total_expenditure",
+                        "grocery_expenditure",
+                        "dining_expenditure",
+                        "misc_expenditure",
+                        "times_dined",
+                        "alcohol_included",
+                        "assistance_programs")
+
+
+### c. ###
+food_usd <- food_exp[food_exp$currency == "USD", ]
+cat("Before restriction: ", nrow(food_exp), " observations\n")
+cat("After restriction: ", nrow(food_usd), " observations\n")
+
+
+### d. ###
+food_exp <- food_exp[food_exp$age >= 18 & food_exp$age <= 100, ]
+# Excluded all minors as they are unlikely to be responsible for food spending, as well as implausible ages
+
+
+### e. ###
+valid_states <- state.abb #Pre-made vector of all 50 U.S states
+valid_states <- c(valid_states, "DC")
+food_exp <- food_exp[food_exp$state %in% valid_states, ]
+# Removed invalid or missing entries for state name abbreviations
+
+
+### f. ###
+food_exp <- food_exp[!is.na(food_exp$total_expenditure) & food_exp$total_expenditure >= 0, ]
+food_exp <- food_exp[is.na(food_exp$grocery_expenditure) | (food_exp$grocery_expenditure >= 0), ]
+food_exp <- food_exp[is.na(food_exp$dining_expenditure) | (food_exp$dining_expenditure >= 0), ]
+food_exp <- food_exp[is.na(food_exp$misc_expenditure) | (food_exp$misc_expenditure >= 0), ]
+# Removed all instances of negative and missing values for total expenditure, but allowed NA to be a valid response for any of the subcategories/types of expenditures
+
+
+### g. ###
+food_exp <- food_exp[
+  (food_exp$times_dined > 0 & (is.na(food_exp$dining_expenditure) | food_exp$dining_expenditure >= 0)) |
+  (food_exp$times_dined == 0 & (is.na(df_clean$dining_expenditure) | food_exp$dining_expenditure == 0)),
+]
+# Removed inconsistent/implausible responses between number of reported times dined out and dining expenditures
+
+
+### h. ###
+nrow(food_exp)
+# 181 rows
+
+
+##### Problem 3 #####
+#' Compute the next number in the Collatz sequence
+#' 
+#' @param n A positive number
+#' @ return The next positive integer in the Collatz sequence
+nextCollatz <- function(n) {
+  if (!is.numeric(n) || length(n) != 1 || n <= 0 || n != floor(n)) {
+    stop("Input must be a single positive integer")
+  }
+  
+  if (n %% 2 == 0) {
+    return(n / 2)
+  } else {
+    return(3 * n + 1)
+  }
+}
+
+nextCollatz(5)
+# [1] 16
+nextCollatz(16)
+# [1] 8
+
+
+### b. ###
+#' Compute the full Collatz sequence for a given integer
+#' 
+#' @param n A positive integer
+#' @return A list containing:
+#'            sequence: a vector of the Collatz sequence from n to 1
+#'            length: the length of the above sequence
+collatzSequence <- function(n) {
+  if (!is.numeric(n) || length(n) != 1 || n <= 0 || n != floor(n)) {
+    stop("Input must be a single positive integer")
+  }
+  
+  seq_vec <- n
+  while (seq_vec[length(seq_vec)] != 1) {
+    seq_vec <- c(seq_vec, nextCollatz(seq_vec[length(seq_vec)]))
+  }
+  
+  return(list(
+    sequence = seq_vec,
+    length = length(seq_vec)
+  ))
+}
+
+collatzSequence(5)
+# $sequence
+# [1]  5 16  8  4  2  1
+
+# $length
+# [1] 6
+
+collatzSequence(19)
+# $sequence
+# [1] 19 58 29 88 44 22 11 34 17 52 26 13 40 20 10  5 16  8  4  2  1
+
+# $length
+# [1] 2
+
+
+### c. ###
 
 
 
 
 
 
-
-
-
-
-
-
-#Resources used: R documentation for subset() and split() functions, 
+#Resources used: R documentation for subset(), split(), and cat() functions, Stack Overflow for Collatz function help
