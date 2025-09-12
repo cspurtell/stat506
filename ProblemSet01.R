@@ -214,10 +214,16 @@ collatzSequence(19)
 
 
 ### c. ###
+values <- 100:500
+seq_lengths <- sapply(values, function(x) collatzSequence(x)$length)
+min_len <- min(seq_lengths)
+shortest_start <- values[which(seq_lengths == min_len)[1]]  # lowest start in case of tie
+max_len <- max(seq_lengths)
+longest_start <- values[which(seq_lengths == max_len)[1]]  # lowest start in case of tie
 
-
-
-
-
+cat("Shortest Collatz sequence starts at", shortest_start, "with length", min_len, "\n")
+# Shortest Collatz sequence starts at 128 with length 8
+cat("Longest Collatz sequence starts at", longest_start, "with length", max_len, "\n")
+# Longest Collatz sequence starts at 327 with length 144
 
 #Resources used: R documentation for subset(), split(), and cat() functions, Stack Overflow for Collatz function help
