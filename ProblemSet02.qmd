@@ -1,0 +1,331 @@
+---
+title: "Purtell_ProblemSet02"
+author: "Colin Purtell"
+format:
+  html: 
+    embed-resources: true
+    standalone: true
+editor: visual
+---
+
+## STATS 506 Problem Set 2:
+
+Link to repository: <https://github.com/cspurtell/stat506>
+
+### Problem 1
+
+#### a.
+
+```{r}
+random_walk1 <- function(n, seed = NULL) {
+  if (!is.null(seed)) set.seed(seed)
+  position <- 0
+  for (i in 1:n) {
+    step <- runif(1) #Pulls random value from uniform dist.
+    if (step < 0.5) {
+      if (runif(1) < 0.05) {
+        position <- position + 10
+      } else {
+        position <- position + 1
+      }
+    } else {
+      if (runif(1) < 0.2) {
+        position <- position - 3
+      } else {
+        position <- position - 1
+      }
+    }
+  }
+  
+  return(position)
+}
+
+random_walk2 <- function(n, seed = NULL) {
+  if (!is.null(seed)) set.seed(seed)
+  u <- runif(2 * n)
+  dir <- u[seq(1, 2*n, by = 2)] < 0.5    #Direction
+  sub <- u[seq(2, 2*n, by = 2)]          #Subtype
+  steps <- ifelse(dir,
+                  ifelse(sub < 0.05, 10, 1),   
+                  ifelse(sub < 0.2, -3, -1))
+  
+  sum(steps)
+}
+
+random_walk3 <- function(n, seed = NULL) {
+  if (!is.null(seed)) set.seed(seed)
+  steps <- sapply(1:n, function(i) {
+    if (runif(1) < 0.5) {
+      if (runif(1) < 0.05) 10 else 1
+    } else {
+      if (runif(1) < 0.2) -3 else -1
+    }
+  })
+  
+  sum(steps)
+}
+```
+
+```{r}
+random_walk1(10)
+random_walk2(10)
+random_walk3(10)
+random_walk1(1000)
+random_walk2(1000)
+random_walk3(1000)
+```
+
+#### b.
+
+```{r}
+random_walk1(10, seed=42)
+random_walk2(10, seed=42)
+random_walk3(10, seed=42)
+```
+
+```{r}
+random_walk1(1000, seed=42)
+random_walk2(1000, seed=42)
+random_walk3(1000, seed=42)
+```
+
+#### c.
+
+For low input (1,000):
+
+```{r}
+library(microbenchmark)
+
+microbenchmark(
+  loop = random_walk1(1000),
+  vectorized = random_walk2(1000),
+  apply = random_walk3(1000),
+  times = 100
+)
+```
+
+For large input (100,000):
+
+```{r}
+microbenchmark(
+  loop = random_walk1(100000),
+  vectorized = random_walk2(100000),
+  apply = random_walk3(100000),
+  times = 10
+)
+```
+
+#### d.
+
+```{r}
+simulate_prob <- function(n, trials = 10000) {
+  results <- replicate(trials, random_walk1(n) == 0)
+  successes <- sum(results)   # count how many ended at 0
+  prop.test(successes, trials)
+}
+```
+
+For n = 10, we have:
+
+```{r}
+simulate_prob(10)
+```
+
+Therefore, the probability that a walk ends at 0 after 10 steps is 13.75%
+
+For n = 100, we have:
+
+```{r}
+simulate_prob(100)
+```
+
+Therefore, the probability that a walk ends at 0 after 100 steps is 1.73%
+
+For n = 1,000, we have:
+
+```{r}
+simulate_prob(1000)
+```
+
+Therefore, the probability that a walk ends at 0 after 1,000 steps is 0.66%
+
+### Problem 2
+
+```{r}
+simulate_daily_cars <- function(trials = 100000, seed = 1) {
+  if (!is.null(seed)) set.seed(seed)
+
+  totals <- rowSums(cbind(
+    replicate(8, rpois(trials, 1)),           # midnight-7AM
+    rnorm(trials, 60, sqrt(12)),              # 8AM
+    replicate(8, rpois(trials, 8)),           # 9AM-4PM
+    rnorm(trials, 60, sqrt(12)),              # 5PM
+    replicate(6, rpois(trials, 12))           # 6PM-11PM
+  ))
+  
+  mean_daily <- mean(totals)
+  se_mean <- sd(totals) / sqrt(trials)
+  ci95 <- mean_daily + c(-1,1) * qnorm(0.975) * se_mean
+  
+  list(mean_daily = mean_daily, se_mean = se_mean, ci95_mean = ci95)
+}
+
+simulate_daily_cars()
+```
+
+According to the results, the average number of cars that pass the specified intersection per day is about 264.
+
+### Problem 3
+
+```{r}
+youtube <- read.csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2021/2021-03-02/youtube.csv')
+```
+
+#### a.
+
+In order to de-identify the data, we remove the following columns: year, brand, Superbowl URL, YouTube URL, id, etag, published_at, title, description, thumbnail, & channel title
+
+```{r}
+youtube_sub <- subset(youtube, select = -c(brand, superbowl_ads_dot_com_url, youtube_url, id, etag, published_at, title, description, thumbnail,
+  channel_title)
+)
+
+dim(youtube_sub)
+```
+
+#### b.
+
+I. View counts
+
+```{r}
+hist(youtube_sub$view_count, main="Views", breaks=30)
+```
+
+This seems viable enough, but will need a log transformation:
+
+```{r}
+youtube_sub$log_view_count <- log1p(youtube_sub$view_count)
+hist(youtube_sub$log_view_count, main="Views", breaks=30)
+```
+
+With the transformation applied, we can see that view count is now appropriate to use
+
+II\. Like counts
+
+```{r}
+hist(youtube_sub$like_count, main="Like Count", xlab="", breaks=30)
+```
+
+This seems viable enough, but will need a log transformation:
+
+```{r}
+youtube_sub$log_like_count <- log1p(youtube_sub$like_count)
+hist(youtube_sub$log_like_count, main="Like Count", xlab="", breaks = 30)
+```
+
+With the transformation applied, we can see that like count is now appropriate to use
+
+III\. Dislike count
+
+```{r}
+hist(youtube_sub$dislike_count, main="Dislike Count", xlab="", breaks=30)
+```
+
+This seems iffy, but we can try a log transformation like the previous variables:
+
+```{r}
+youtube_sub$log_dislike_count <- log1p(youtube_sub$dislike_count)
+hist(youtube_sub$log_dislike_count, main="Dislike Count", xlab="", breaks=30)
+```
+
+With the transformation applied, we can see that dislike count is now appropriate to use
+
+IV\. Favorite Count
+
+```{r}
+hist(youtube_sub$favorite_count, main="Favorite Count", xlab="", breaks=30)
+```
+
+This variable does not seem appropriate to use for a linear model
+
+V. Comment count
+
+```{r}
+hist(youtube_sub$comment_count, main="Comment Count", xlab="", breaks=30)
+```
+
+This seems viable enough, but will need a log transformation:
+
+```{r}
+youtube_sub$log_comment_count <- log1p(youtube_sub$comment_count)
+hist(youtube_sub$log_comment_count, main="Comment Count", xlab="", breaks=30)
+```
+
+With the transformation applied, we can see that dislike count is now appropriate to use
+
+#### c.
+
+I. View counts
+
+```{r}
+model_views <- lm(log_view_count ~ funny + show_product_quickly + patriotic + 
+                    celebrity + danger + animals + use_sex + year, 
+                  data = youtube_sub)
+summary(model_views)
+```
+
+According to the summary output, none of the predictors are significant at conventional thresholds such as 0.05. The overall model fit is weak, and the coefficients suggest a mostly positive relationship. However, the F-statistic and p-value indicate that the inputs as a set have some predictive value.
+
+II\. Like counts
+
+```{r}
+model_likes <- lm(log_like_count ~ funny + show_product_quickly + patriotic + 
+                    celebrity + danger + animals + use_sex + year, 
+                  data = youtube_sub)
+summary(model_likes)
+```
+
+According to the summary output, only year is a significant predictor at conventional thresholds such as 0.05. The overall model fit is weak, and the coefficients suggest a mostly positive relationship. However, the F-statistic and p-value indicate that the inputs as a set have some predictive value.
+
+III\. Dislike counts
+
+```{r}
+model_dislikes <- lm(log_dislike_count ~ funny + show_product_quickly + patriotic + 
+                    celebrity + danger + animals + use_sex + year, 
+                  data = youtube_sub)
+summary(model_dislikes)
+```
+
+According to the summary output, only year is a significant predictor at conventional thresholds such as 0.05, although "patriotic" comes very close. The overall model fit is weak, and the coefficients suggest a mixed relationship with both positive and negative slopes. However, the F-statistic and p-value indicate that the inputs as a set have some predictive value.
+
+IV\. Comment counts
+
+```{r}
+model_comments <- lm(log_comment_count ~ funny + show_product_quickly + patriotic + 
+                       celebrity + danger + animals + use_sex + year, 
+                     data = youtube_sub)
+summary(model_comments)
+```
+
+According to the summary output, none of the predictors are significant at conventional thresholds such as 0.05, although year comes close. The overall model fit is weak, and the coefficients suggest a mostly positive relationship (were there to be one). The F-statistic and p-value indicate that the inputs as a set do not have any significant predictive power.
+
+#### d.
+
+```{r}
+y <- youtube_sub$log_view_count
+X <- model.matrix(~ funny + show_product_quickly + patriotic +
+                    celebrity + danger + animals + use_sex + year, 
+                  data = youtube_sub)
+complete_idx <- complete.cases(X, y)
+X <- X[complete_idx, ]
+y <- y[complete_idx]
+
+beta_hat <- solve(crossprod(X)) %*% crossprod(X, y)
+beta_hat
+```
+
+When comparing these results to the coefficients found using lm(), we find identical values.
+
+### Resources Used:
+
+R documentation for model.matrix(), ChatGPT for debugging purposes

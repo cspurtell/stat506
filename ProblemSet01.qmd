@@ -10,6 +10,8 @@ editor: visual
 
 ## STATS 506 Problem Set 1:
 
+Link to repository: <https://github.com/cspurtell/stat506>
+
 ### Problem 1
 
 #### a.
@@ -35,7 +37,7 @@ table(abalones$Sex)
 
 According to the table, there are 1307 female abalones, 1342 infants, and 1527 males.
 
-#### c. 
+#### c.
 
 ```{r}
 weights <- abalones[, c("Whole.weight", "Shucked.weight", "Viscera.weight", 
