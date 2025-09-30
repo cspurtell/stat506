@@ -264,11 +264,11 @@ summary(model_dislikes)
 #   lm(formula = log_dislike_count ~ funny + show_product_quickly + 
 #        patriotic + celebrity + danger + animals + use_sex + year, 
 #      data = youtube_sub)
-
+#
 # Residuals:
 #   Min      1Q  Median      3Q     Max 
 # -4.0292 -1.3299 -0.3192  0.8986  8.7219 
-
+#
 # Coefficients:
 #   Estimate Std. Error t value Pr(>|t|)    
 # (Intercept)              -183.06813   53.34768  -3.432 0.000719 ***
@@ -280,10 +280,69 @@ summary(model_dislikes)
 # animalsTRUE                -0.21192    0.29675  -0.714 0.475911    
 # use_sexTRUE                -0.32980    0.33681  -0.979 0.328583    
 # year                        0.09207    0.02653   3.471 0.000626 ***
-  ---
+# ---
 #  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
+#
 # Residual standard error: 2.074 on 216 degrees of freedom
 # (22 observations deleted due to missingness)
 # Multiple R-squared:  0.09753,	Adjusted R-squared:  0.06411 
 # F-statistic: 2.918 on 8 and 216 DF,  p-value: 0.004115
+
+model_comments <- lm(log_comment_count ~ funny + show_product_quickly + patriotic + 
+                       celebrity + danger + animals + use_sex + year, 
+                     data = youtube_sub)
+summary(model_comments)
+
+# Call:
+#   lm(formula = log_comment_count ~ funny + show_product_quickly + 
+#        patriotic + celebrity + danger + animals + use_sex + year, 
+#      data = youtube_sub)
+# 
+# Residuals:
+#   Min      1Q  Median      3Q     Max 
+# -4.1372 -1.4665 -0.1427  1.4061  5.8468 
+# 
+# Coefficients:
+#   Estimate Std. Error t value Pr(>|t|)  
+# (Intercept)              -99.09835   52.92351  -1.872   0.0625 .
+# funnyTRUE                  0.21954    0.34528   0.636   0.5256  
+# show_product_quicklyTRUE   0.40939    0.30229   1.354   0.1771  
+# patrioticTRUE              0.66698    0.39902   1.672   0.0961 .
+# celebrityTRUE              0.29767    0.31541   0.944   0.3464  
+# dangerTRUE                 0.17784    0.31069   0.572   0.5677  
+# animalsTRUE               -0.26802    0.29347  -0.913   0.3621  
+# use_sexTRUE               -0.39323    0.33163  -1.186   0.2370  
+# year                       0.05034    0.02632   1.913   0.0571 .
+# ---
+#   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+# Residual standard error: 2.039 on 213 degrees of freedom
+# (25 observations deleted due to missingness)
+# Multiple R-squared:  0.06535,	Adjusted R-squared:  0.03025 
+# F-statistic: 1.862 on 8 and 213 DF,  p-value: 0.06748
+
+
+### d. ###
+y <- youtube_sub$log_view_count
+X <- model.matrix(~ funny + show_product_quickly + patriotic +
+                    celebrity + danger + animals + use_sex + year, 
+                  data = youtube_sub)
+complete_idx <- complete.cases(X, y)
+X <- X[complete_idx, ]
+y <- y[complete_idx]
+
+beta_hat <- solve(crossprod(X)) %*% crossprod(X, y)
+beta_hat
+# [,1]
+# (Intercept)              -31.55015804
+# funnyTRUE                  0.56492445
+# show_product_quicklyTRUE   0.21088918
+# patrioticTRUE              0.50699051
+# celebrityTRUE              0.03547862
+# dangerTRUE                 0.63131085
+# animalsTRUE               -0.31001838
+# use_sexTRUE               -0.38670726
+# year                       0.02053399
+
+
+#Resources Used: R documentation for model.matrix() function, ChatGPT for debugging
