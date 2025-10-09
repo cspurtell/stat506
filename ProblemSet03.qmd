@@ -1,19 +1,43 @@
-##### Problem 1. #####
+---
+title: "Purtell_ProblemSet03"
+author: "Colin Purtell"
+format:
+  html: 
+    embed-resources: true
+    standalone: true
+editor: visual
+---
 
+## STATS 506 Problem Set 2:
+
+Link to repository: <https://github.com/cspurtell/stat506>\
+
+### Problem 1
+
+```{r}
 library(haven)
 library(dplyr)
+```
 
-### a. ###
+#### a.
+
+```{r}
 aux <- read_xpt("data/AUX_I.xpt")
 demo <- read_xpt("data/DEMO_I.xpt")
 
-intersect(names(aux), names(demo))
+# intersect(names(aux), names(demo))
 
 merged <- inner_join(aux, demo, by = "SEQN")
 dim(merged)
-# [1] 4582  119
+```
 
-### b. ###
+The merged dataset has 4582 rows and 119 columns
+
+#### b.
+
+For the gender variable:
+
+```{r}
 merged <- merged %>%
   mutate(RIAGENDR = case_when(
     RIAGENDR == 1 ~ "Male",
@@ -21,7 +45,11 @@ merged <- merged %>%
     TRUE ~ NA_character_
   )) %>%
   mutate(RIAGENDR = factor(RIAGENDR))
+```
 
+For the citizenship status variable:
+
+```{r}
 merged <- merged %>%
   mutate(DMDCITZN = case_when(
     DMDCITZN == 1 ~ "Citizen by birth or naturalization",
@@ -31,13 +59,21 @@ merged <- merged %>%
     TRUE ~ NA_character_
   )) %>%
   mutate(DMDCITZN = factor(DMDCITZN))
+```
 
+For the number of children variable:
+
+```{r}
 merged <- merged %>%
   mutate(
     DMDHHSZA = as.numeric(DMDHHSZA),
     DMDHHSZA = ifelse(DMDHHSZA == 3, 3, DMDHHSZA)
   )
+```
 
+For the annual household income variable:
+
+```{r}
 merged <- merged %>% 
   mutate(INDHHIN2 = case_when(
     INDHHIN2 == 1  ~ "$0–$4,999",
@@ -71,12 +107,13 @@ merged <- merged %>%
       )
     )
   )
+```
 
-### c. ###
-library(broom)
-library(pscl)
-library(knitr)
+#### c.
 
+Need to convert annual household income to a continuous variable first:
+
+```{r}
 income_midpoints <- c(
   `1` = 2500, `2` = 7500, `3` = 12500, `4` = 17500,
   `5` = 22500, `6` = 30000, `7` = 40000, `8` = 50000,
@@ -89,6 +126,12 @@ merged <- merged %>%
     INDHHIN2 = as.numeric(INDHHIN2),
     Income_cont = income_midpoints[as.character(INDHHIN2)]
   )
+```
+
+```{r}
+library(broom)
+library(pscl)
+library(knitr)
 
 model_1R <- glm(AUXTWIDR ~ RIAGENDR, data = merged, family = poisson)
 model_2R <- glm(AUXTWIDR ~ RIAGENDR + DMDCITZN + DMDHHSZA + INDHHIN2, 
@@ -97,7 +140,9 @@ model_2R <- glm(AUXTWIDR ~ RIAGENDR + DMDCITZN + DMDHHSZA + INDHHIN2,
 model_1L <- glm(AUXTWIDL ~ RIAGENDR, data = merged, family = poisson)
 model_2L <- glm(AUXTWIDL ~ RIAGENDR + DMDCITZN + DMDHHSZA + INDHHIN2, 
                 data = merged, family = poisson)
+```
 
+```{r}
 summarize_poisson <- function(model) {
   irr <- exp(coef(model))  # incidence rate ratios
   ci <- exp(confint(model))
@@ -123,7 +168,11 @@ m1R <- summarize_poisson(model_1R)
 m2R <- summarize_poisson(model_2R)
 m1L <- summarize_poisson(model_1L)
 m2L <- summarize_poisson(model_2L)
+```
 
+The coefficient table is as follows:
+
+```{r}
 coefs_table <- bind_rows(
   m1R$coefs %>% mutate(Model = "1R: Right ear (Gender only)"),
   m2R$coefs %>% mutate(Model = "2R: Right ear (Full model)"),
@@ -133,6 +182,12 @@ coefs_table <- bind_rows(
   select(Model, term, IRR, CI_low, CI_high, p.value) %>%
   mutate(across(c(IRR, CI_low, CI_high, p.value), ~round(., 3)))
 
+kable(coefs_table, caption = "Incidence Rate Ratios for Poisson Models")
+```
+
+The model statistics table is as follows:
+
+```{r}
 stats_table <- bind_rows(
   m1R$stats %>% mutate(Model = "1R: Right ear (Gender only)"),
   m2R$stats %>% mutate(Model = "2R: Right ear (Full model)"),
@@ -141,33 +196,31 @@ stats_table <- bind_rows(
 ) %>%
   select(Model, N, Pseudo_R2, AIC)
 
-kable(coefs_table, caption = "Incidence Rate Ratios for Poisson Models")
-
 kable(stats_table, caption = "Model Sample Sizes, Pseudo-R², and AIC Values")
+```
 
-### d. ###
+#### d.
+
+```{r}
 summary(model_2L)
+```
 
-exp(coef(model_2L))   # IRRs
-confint(model_2L)     # Confidence intervals for log(IRR)
-exp(confint(model_2L)) # Confidence intervals for IRR
+### Problem 2
 
-
-
-
-
-
-
-
-##### Problem 2. #####
+```{r}
 library(DBI)
 library(RSQLite)
 library(microbenchmark)
 
 con <- dbConnect(RSQLite::SQLite(), "data/sakila_master.db")
-dbListTables(con)
+# dbListTables(con)
+```
 
-### a. ###
+#### a.
+
+Using R operations:
+
+```{r}
 customer_df <- dbGetQuery(con, "SELECT customer_id, store_id, active FROM customer") %>% 
   mutate(active = as.numeric(active))
 store_df <- dbGetQuery(con, "SELECT store_id, address_id FROM store")
@@ -179,11 +232,11 @@ store_stats <- customer_df %>%
     pct_active = round(100 * active_customers / total_customers, 2)
   )
 store_stats
-# store_id total_customers active_customers pct_active
-# <int>           <int>            <dbl>      <dbl>
-#   1        1             326              318       97.6
-#   2        2             273              266       97.4
+```
 
+Using a single SQL query:
+
+```{r}
 query <- "
 SELECT 
   store_id,
@@ -196,10 +249,11 @@ GROUP BY store_id
 
 store_stats_sql <- dbGetQuery(con, query)
 store_stats_sql
-# store_id total_customers active_customers pct_active
-# 1        1             326              318      97.55
-# 2        2             273              266      97.44
+```
 
+Testing performance of the above methods:
+
+```{r}
 microbenchmark(
   R_approach = {
     customer_df %>%
@@ -211,12 +265,13 @@ microbenchmark(
   SQL_approach = dbGetQuery(con, query),
   times = 10
 )
-# Unit: microseconds
-# expr      min       lq     mean   median       uq      max neval
-# R_approach 4567.001 4686.000 4844.901 4723.502 4909.802 5703.201    10
-# SQL_approach  879.901  974.401 1059.851 1009.651 1110.800 1492.201    10
+```
 
-### b. ###
+#### b.
+
+Using R operations:
+
+```{r}
 staff_df <- dbGetQuery(con, "SELECT staff_id, first_name, last_name, address_id FROM staff")
 address_df <- dbGetQuery(con, "SELECT address_id, city_id FROM address")
 city_df <- dbGetQuery(con, "SELECT city_id, country_id FROM city")
@@ -228,7 +283,11 @@ staff_country <- staff_df %>%
   left_join(country_df, by = "country_id") %>%
   select(first_name, last_name, country)
 staff_country
+```
 
+Using a single SQL query:
+
+```{r}
 query <- "
 SELECT s.first_name, s.last_name, c.country
 FROM staff s
@@ -239,7 +298,11 @@ JOIN country c ON ci.country_id = c.country_id
 
 staff_country_sql <- dbGetQuery(con, query)
 staff_country_sql
+```
 
+Testing performance of the above methods:
+
+```{r}
 microbenchmark(
   R_approach = {
     staff_df %>%
@@ -251,8 +314,13 @@ microbenchmark(
   SQL_approach = dbGetQuery(con, query),
   times = 10
 )
+```
 
-### c. ###
+#### c.
+
+Using R operations:
+
+```{r}
 payment_df <- dbGetQuery(con, "SELECT rental_id, amount FROM payment")
 rental_df <- dbGetQuery(con, "SELECT rental_id, inventory_id FROM rental")
 inventory_df <- dbGetQuery(con, "SELECT inventory_id, film_id FROM inventory")
@@ -265,7 +333,11 @@ film_value <- payment_df %>%
   group_by(film_id, title) %>%
   summarise(total_value = sum(amount), .groups = 'drop')
 film_value %>% filter(total_value == max(total_value))
+```
 
+Using a single SQL query:
+
+```{r}
 query <- "
 SELECT f.title, SUM(p.amount) AS total_value
 FROM payment p
@@ -286,7 +358,11 @@ HAVING SUM(p.amount) = (
 
 film_max_sql <- dbGetQuery(con, query)
 film_max_sql
+```
 
+Testing the performance of the above methods:
+
+```{r}
 microbenchmark(
   R_approach = {
     film_value <- payment_df %>%
@@ -300,30 +376,55 @@ microbenchmark(
   SQL_approach = dbGetQuery(con, query),
   times = 10
 )
+```
 
-##### Problem 3. #####
+### Problem 3
+
+```{r}
 aus_data <- read.csv("data/au-500.csv")
+```
 
-### a. ###
+#### a.
+
+```{r}
 library(stringr)
 percent_com <- mean(str_detect(aus_data$web, "\\.com$")) * 100
 percent_com
+```
 
-### b. ###
+There does not appear to be any website URLS ending in .com, as they all seem to end in .com.aus
+
+#### b.
+
+```{r}
 domains <- str_extract(aus_data$email, "(?<=@).*")
 most_common_domain <- domains %>% table() %>% sort(decreasing = TRUE)
 most_common_domain[1]
+```
 
-### c. ###
+The most common domain name appears to be hotmail.com
+
+#### c.
+
+```{r}
 non_alpha <- str_detect(aus_data$company_name, "[^A-Za-z ,]")
 prop_non_alpha <- mean(non_alpha)
 prop_non_alpha
+```
 
+Approximately 9% of company names contain non-alphabetic characters
+
+```{r}
 non_alpha2 <- str_detect(aus_data$company_name, "[^A-Za-z ,&]")
 prop_non_alpha2 <- mean(non_alpha2)
 prop_non_alpha2
+```
 
-### d. ###
+Excluding ampersands, this proportion decreases to 8%
+
+#### d.
+
+```{r}
 convert_to_cell <- function(phone) {
   phone <- gsub("-", "", phone)
   ifelse(str_length(phone) == 10,
@@ -335,20 +436,24 @@ aus_data$phone1 <- sapply(aus_data$phone1, convert_to_cell)
 aus_data$phone2 <- sapply(aus_data$phone2, convert_to_cell)
 head(aus_data$phone1, 10)
 head(aus_data$phone2, 10)
+```
 
-### e. ###
+#### e.
+
+```{r}
 library(ggplot2)
 apt_num <- as.numeric(str_extract(aus_data$address, "(?<=#)\\d+"))
 ggplot(data.frame(apt_num), aes(x=log(apt_num))) +
   geom_histogram(binwidth = 0.5, fill="blue", color="black") +
   labs(title="Histogram of log(Apartment Numbers)", x="log(Apartment Number)", y="Count")
+```
 
-### f. ###
+#### f.
+
+```{r}
 leading_digit <- as.numeric(substr(apt_num, 1, 1))
 benford_table <- table(leading_digit)/length(leading_digit)
 benford_expected <- log10(1 + 1/1:9)
 
 data.frame(Digit = 1:9, Observed = benford_table, Expected = benford_expected)
-
-### Resources used: Tidyverse documentation for str_detect() and assistance with Problem 2, R documentation for glm() function, 
-
+```
