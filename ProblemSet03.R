@@ -77,3 +77,63 @@ merged <- merged %>%
   )
 
 ### c. ###
+library(broom)
+library(pscl)
+library(knitr)
+
+model_1R <- glm(AUXTWIDR ~ RIAGENDR, data = merged, family = poisson)
+model_2R <- glm(AUXTWIDR ~ RIAGENDR + DMDCITZN + DMDHHSZA + INDHHIN2, 
+                data = merged, family = poisson)
+
+model_1L <- glm(AUXTWIDL ~ RIAGENDR, data = merged, family = poisson)
+model_2L <- glm(AUXTWIDL ~ RIAGENDR + DMDCITZN + DMDHHSZA + INDHHIN2, 
+                data = merged, family = poisson)
+
+summarize_poisson <- function(model) {
+  irr <- exp(coef(model))  # incidence rate ratios
+  ci <- exp(confint(model))
+  
+  tidy_df <- broom::tidy(model) %>%
+    mutate(
+      IRR = exp(estimate),
+      CI_low = exp(estimate - 1.96 * std.error),
+      CI_high = exp(estimate + 1.96 * std.error)
+    ) %>%
+    select(term, IRR, CI_low, CI_high, p.value)
+  
+  stats <- data.frame(
+    N = nobs(model),
+    Pseudo_R2 = round(pscl::pR2(model)["McFadden"], 3),
+    AIC = AIC(model)
+  )
+  
+  list(coefs = tidy_df, stats = stats)
+}
+
+m1R <- summarize_poisson(model_1R)
+m2R <- summarize_poisson(model_2R)
+m1L <- summarize_poisson(model_1L)
+m2L <- summarize_poisson(model_2L)
+
+coefs_table <- bind_rows(
+  m1R$coefs %>% mutate(Model = "1R: Right ear (Gender only)"),
+  m2R$coefs %>% mutate(Model = "2R: Right ear (Full model)"),
+  m1L$coefs %>% mutate(Model = "1L: Left ear (Gender only)"),
+  m2L$coefs %>% mutate(Model = "2L: Left ear (Full model)")
+) %>%
+  select(Model, term, IRR, CI_low, CI_high, p.value) %>%
+  mutate(across(c(IRR, CI_low, CI_high, p.value), ~round(., 3)))
+
+stats_table <- bind_rows(
+  m1R$stats %>% mutate(Model = "1R: Right ear (Gender only)"),
+  m2R$stats %>% mutate(Model = "2R: Right ear (Full model)"),
+  m1L$stats %>% mutate(Model = "1L: Left ear (Gender only)"),
+  m2L$stats %>% mutate(Model = "2L: Left ear (Full model)")
+) %>%
+  select(Model, N, Pseudo_R2, AIC)
+
+kable(coefs_table, caption = "Incidence Rate Ratios for Poisson Models")
+
+kable(stats_table, caption = "Model Sample Sizes, Pseudo-R², and AIC Values")
+
+### d. ###
