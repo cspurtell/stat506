@@ -137,3 +137,197 @@ kable(coefs_table, caption = "Incidence Rate Ratios for Poisson Models")
 kable(stats_table, caption = "Model Sample Sizes, Pseudo-R², and AIC Values")
 
 ### d. ###
+
+
+
+
+
+
+
+
+
+##### Problem 2. #####
+library(DBI)
+library(RSQLite)
+library(microbenchmark)
+
+con <- dbConnect(RSQLite::SQLite(), "data/sakila_master.db")
+dbListTables(con)
+
+### a. ###
+customer_df <- dbGetQuery(con, "SELECT customer_id, store_id, active FROM customer") %>% 
+  mutate(active = as.numeric(active))
+store_df <- dbGetQuery(con, "SELECT store_id, address_id FROM store")
+store_stats <- customer_df %>%
+  group_by(store_id) %>%
+  summarise(
+    total_customers = n(),
+    active_customers = sum(active),
+    pct_active = round(100 * active_customers / total_customers, 2)
+  )
+store_stats
+# store_id total_customers active_customers pct_active
+# <int>           <int>            <dbl>      <dbl>
+#   1        1             326              318       97.6
+#   2        2             273              266       97.4
+
+query <- "
+SELECT 
+  store_id,
+  COUNT(customer_id) AS total_customers,
+  SUM(active) AS active_customers,
+  ROUND(100.0 * SUM(active)/COUNT(customer_id), 2) AS pct_active
+FROM customer
+GROUP BY store_id
+"
+
+store_stats_sql <- dbGetQuery(con, query)
+store_stats_sql
+# store_id total_customers active_customers pct_active
+# 1        1             326              318      97.55
+# 2        2             273              266      97.44
+
+microbenchmark(
+  R_approach = {
+    customer_df %>%
+      group_by(store_id) %>%
+      summarise(total_customers = n(),
+                active_customers = sum(active),
+                pct_active = round(100 * active_customers / n(), 2))
+  },
+  SQL_approach = dbGetQuery(con, query),
+  times = 10
+)
+# Unit: microseconds
+# expr      min       lq     mean   median       uq      max neval
+# R_approach 4567.001 4686.000 4844.901 4723.502 4909.802 5703.201    10
+# SQL_approach  879.901  974.401 1059.851 1009.651 1110.800 1492.201    10
+
+### b. ###
+staff_df <- dbGetQuery(con, "SELECT staff_id, first_name, last_name, address_id FROM staff")
+address_df <- dbGetQuery(con, "SELECT address_id, city_id FROM address")
+city_df <- dbGetQuery(con, "SELECT city_id, country_id FROM city")
+country_df <- dbGetQuery(con, "SELECT country_id, country FROM country")
+
+staff_country <- staff_df %>%
+  left_join(address_df, by = "address_id") %>%
+  left_join(city_df, by = "city_id") %>%
+  left_join(country_df, by = "country_id") %>%
+  select(first_name, last_name, country)
+staff_country
+
+query <- "
+SELECT s.first_name, s.last_name, c.country
+FROM staff s
+JOIN address a ON s.address_id = a.address_id
+JOIN city ci ON a.city_id = ci.city_id
+JOIN country c ON ci.country_id = c.country_id
+"
+
+staff_country_sql <- dbGetQuery(con, query)
+staff_country_sql
+
+microbenchmark(
+  R_approach = {
+    staff_df %>%
+      left_join(address_df, by = "address_id") %>%
+      left_join(city_df, by = "city_id") %>%
+      left_join(country_df, by = "country_id") %>%
+      select(first_name, last_name, country)
+  },
+  SQL_approach = dbGetQuery(con, query),
+  times = 10
+)
+
+### c. ###
+payment_df <- dbGetQuery(con, "SELECT rental_id, amount FROM payment")
+rental_df <- dbGetQuery(con, "SELECT rental_id, inventory_id FROM rental")
+inventory_df <- dbGetQuery(con, "SELECT inventory_id, film_id FROM inventory")
+film_df <- dbGetQuery(con, "SELECT film_id, title FROM film")
+
+film_value <- payment_df %>%
+  left_join(rental_df, by = "rental_id") %>%
+  left_join(inventory_df, by = "inventory_id") %>%
+  left_join(film_df, by = "film_id") %>%
+  group_by(film_id, title) %>%
+  summarise(total_value = sum(amount), .groups = 'drop')
+film_value %>% filter(total_value == max(total_value))
+
+query <- "
+SELECT f.title, SUM(p.amount) AS total_value
+FROM payment p
+JOIN rental r ON p.rental_id = r.rental_id
+JOIN inventory i ON r.inventory_id = i.inventory_id
+JOIN film f ON i.film_id = f.film_id
+GROUP BY f.film_id, f.title
+HAVING SUM(p.amount) = (
+    SELECT MAX(total_val) FROM (
+        SELECT SUM(p2.amount) AS total_val
+        FROM payment p2
+        JOIN rental r2 ON p2.rental_id = r2.rental_id
+        JOIN inventory i2 ON r2.inventory_id = i2.inventory_id
+        GROUP BY i2.film_id
+    )
+)
+"
+
+film_max_sql <- dbGetQuery(con, query)
+film_max_sql
+
+microbenchmark(
+  R_approach = {
+    film_value <- payment_df %>%
+      left_join(rental_df, by = "rental_id") %>%
+      left_join(inventory_df, by = "inventory_id") %>%
+      left_join(film_df, by = "film_id") %>%
+      group_by(film_id, title) %>%
+      summarise(total_value = sum(amount), .groups='drop')
+    film_value %>% filter(total_value == max(total_value))
+  },
+  SQL_approach = dbGetQuery(con, query),
+  times = 10
+)
+
+##### Problem 3. #####
+aus_data <- read.csv("data/au-500.csv")
+
+### a. ###
+library(stringr)
+percent_com <- mean(str_detect(aus_data$web, "\\.com$")) * 100
+percent_com
+
+### b. ###
+domains <- str_extract(aus_data$email, "(?<=@).*")
+most_common_domain <- domains %>% table() %>% sort(decreasing = TRUE)
+most_common_domain[1]
+
+### c. ###
+non_alpha <- str_detect(aus_data$company_name, "[^A-Za-z ,]")
+prop_non_alpha <- mean(non_alpha)
+prop_non_alpha
+
+non_alpha2 <- str_detect(aus_data$company_name, "[^A-Za-z ,&]")
+prop_non_alpha2 <- mean(non_alpha2)
+prop_non_alpha2
+
+### d. ###
+convert_to_cell <- function(phone) {
+  phone <- gsub("-", "", phone)
+  ifelse(str_length(phone) == 10,
+         paste0(substr(phone,1,4), "-", substr(phone,5,7), "-", substr(phone,8,10)),
+         phone)
+}
+
+aus_data$phone1 <- sapply(aus_data$phone1, convert_to_cell)
+aus_data$phone2 <- sapply(aus_data$phone2, convert_to_cell)
+head(aus_data$phone1, 10)
+head(aus_data$phone2, 10)
+
+### e. ###
+library(ggplot2)
+apt_num <- as.numeric(str_extract(aus_data$address, "(?<=#)\\d+"))
+ggplot(data.frame(apt_num), aes(x=log(apt_num))) +
+  geom_histogram(binwidth = 0.5, fill="blue", color="black") +
+  labs(title="Histogram of log(Apartment Numbers)", x="log(Apartment Number)", y="Count")
+
+### Resources used: Tidyverse documentation for str_detect() and assistance with Problem 2, R documentation for glm() function, 
