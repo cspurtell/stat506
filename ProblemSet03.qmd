@@ -457,3 +457,9 @@ benford_expected <- log10(1 + 1/1:9)
 
 data.frame(Digit = 1:9, Observed = benford_table, Expected = benford_expected)
 ```
+
+According to the above table, every leading digit has the same observed frequency in the fake data. This differs greatly from the expected distribution from Benford's Law, as seen in the far-right column. Therefore, it is doubtful that the apartment numbers would pass as real data.
+
+#### Resources Used
+
+Tidyverse documentation for str_detect(), other stringr functions, and assistance with Problem 2, R documentation for glm() function, ChatGPT for debugging and explanation of implementation of Benford's Law.
