@@ -153,12 +153,6 @@ confint(model_2L)     # Confidence intervals for log(IRR)
 exp(confint(model_2L)) # Confidence intervals for IRR
 
 
-
-
-
-
-
-
 ##### Problem 2. #####
 library(DBI)
 library(RSQLite)
