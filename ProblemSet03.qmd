@@ -205,6 +205,14 @@ kable(stats_table, caption = "Model Sample Sizes, Pseudo-R², and AIC Values")
 summary(model_2L)
 ```
 
+In Model 2L, there is a small but statistically significant gender difference in tympanometric width of the left ear (IRR = 0.988, p \< 0.001). This suggests that, holding citizenship, number of young children, and income constant, males have on average slightly lower tympanometric width than females.
+
+```{r}
+exp(coef(model_2L))   # IRRs
+```
+
+Specifically, we find that males have a 1.2% lower expected rate of the outcome, holding all else constant. This is because the IRR is less than 1.
+
 ### Problem 2
 
 ```{r}
