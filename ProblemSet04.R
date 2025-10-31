@@ -111,9 +111,153 @@ player_summary %>%
 #From the above filtering, we find that Rafael Nadal has the highest win rate of around 87%
 
 ##### Problem 3. #####
+usa <- read.csv("data/us-states.csv") %>% 
+  mutate(date = as.Date(date))
 
+### a. ###
+# Aggregate to national series by summing state 7-day averages each day. 
+# Define “spikes” based on simple relative thresholds from that series. A major spike can be 
+# when the 7-day average of new cases per 100k is greater than 75% of the overall maximum value seen in the dataset.
+# A minor spike can be when the 7-day average is between 40% and 75% of the maximum value.
 
+max_cases <- max(usa$cases_avg_per_100k, na.rm = TRUE)
+major_cutoff <- 0.75 * max_cases
+minor_cutoff <- 0.40 * max_cases
 
+usa_spikes <- usa %>%
+  mutate(
+    spike_type = case_when(
+      cases_avg_per_100k >= major_cutoff ~ "Major spike",
+      cases_avg_per_100k >= minor_cutoff ~ "Minor spike",
+      TRUE ~ NA_character_
+    )
+  )
 
+usa_spikes %>%
+  ggplot(aes(x = date, y = cases_avg_per_100k)) +
+  geom_line(color = "grey40") +
+  geom_point(aes(color = spike_type), size = 2, alpha = 0.8, na.rm = TRUE) +
+  scale_color_manual(values = c("Major spike" = "firebrick", "Minor spike" = "goldenrod")) +
+  labs(
+    title = "U.S. COVID-19: Major and Minor Spikes (7-day average per 100k)",
+    subtitle = paste0("Major ≥ ", round(major_cutoff, 1), " per 100k | Minor ≥ ", round(minor_cutoff, 1)),
+    x = NULL,
+    y = "New cases per 100k (7-day avg)",
+    color = "Spike Type",
+    caption = "Source: NYTimes COVID-19 Rolling Averages"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position = "top",
+    plot.title.position = "plot",
+    panel.grid.minor = element_blank()
+  )
 
-#Resources used: Tidyverse documentation for slice_max() and pivot_wider() functions
+spike_counts <- usa_spikes %>%
+  mutate(
+    is_spike = !is.na(spike_type),
+    group_id = cumsum(is.na(lag(spike_type)) & !is.na(spike_type))
+  ) %>%
+  filter(is_spike) %>%
+  group_by(spike_type, group_id) %>%
+  summarise(
+    start_date = min(date),
+    end_date = max(date),
+    .groups = "drop"
+  ) %>%
+  group_by(spike_type) %>%
+  summarise(n_spikes = n(), .groups = "drop")
+
+spike_counts
+#Using our definitions, we find 28 major spikes and 433 minor spikes
+
+### b. ###
+#To keep it simple, we’ll use the average cases_avg_per_100k across the full dataset period for each state.
+#This reflects the typical per-capita infection rate.
+
+state_rates <- usa %>%
+  group_by(state) %>%
+  summarise(mean_rate = mean(cases_avg_per_100k, na.rm = TRUE), .groups = "drop")
+
+top_states <- state_rates %>% slice_max(mean_rate, n = 5) %>% pull(state)
+bottom_states <- state_rates %>% slice_min(mean_rate, n = 5) %>% pull(state)
+
+usa %>%
+  filter(state %in% c(top_states, bottom_states)) %>%
+  mutate(
+    category = case_when(
+      state %in% top_states ~ "Highest overall rate",
+      state %in% bottom_states ~ "Lowest overall rate"
+    )
+  ) %>%
+  ggplot(aes(x = date, y = cases_avg_per_100k, color = state, group = state)) +
+  geom_line(size = 0.8, alpha = 0.9) +
+  facet_wrap(~ category, ncol = 1, scales = "fixed") +
+  labs(
+    title = "COVID-19 Trajectories: States with Highest and Lowest Average Case Rates",
+    subtitle = "7-day rolling average new cases per 100k (Top 5 vs. Bottom 5 states)",
+    x = NULL,
+    y = "Cases per 100k (7-day avg)",
+    caption = "Source: NYTimes COVID-19 Rolling Averages"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position = "top",
+    plot.title.position = "plot",
+    panel.grid.minor = element_blank()
+  )
+#Both groups share the same broad pandemic timeline
+#Top and bottom groups differ dramatically in case magnitude
+
+### c. ###
+#We can define when a state experiences COVID “in a substantial way” as when its 7-day average of new cases per 100k exceeds 1.0 for at least three consecutive days.
+
+first_substantial <- usa %>%
+  group_by(state) %>%
+  arrange(date, .by_group = TRUE) %>%
+  mutate(
+    above = cases_avg_per_100k >= 1.0,
+    run = ave(above, cumsum(!above), FUN = seq_along)
+  ) %>%
+  filter(above & run >= 3) %>%
+  summarise(first_date = min(date), .groups = "drop") %>%
+  arrange(first_date)
+
+first_five <- head(first_substantial, 5)
+
+cov_plot <- usa %>%
+  inner_join(first_five, by = "state") %>%
+  filter(date >= first_date & date <= first_date + 60)
+
+onset_lines <- first_five %>%
+  mutate(first_date = as.Date(first_date))
+
+ggplot(cov_plot, aes(x = date, y = cases_avg_per_100k, color = state)) +
+  geom_line(linewidth = 1) +
+  geom_segment(
+    data = onset_lines,
+    aes(
+      x = first_date, xend = first_date,
+      y = 0, yend = Inf
+    ),
+    inherit.aes = FALSE,
+    color = "gray30", linetype = 2, linewidth = 0.7
+  ) +
+  facet_wrap(~ state, scales = "free_y") +
+  labs(
+    title = "Earliest Substantial COVID Activity by State",
+    subtitle = "First 5 states to exceed 1.0 cases per 100k (7-day avg) for 3+ consecutive days",
+    x = NULL,
+    y = "Cases per 100k (7-day avg)",
+    caption = "Source: NYTimes COVID-19 Rolling Averages"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position = "none",
+    plot.title.position = "plot",
+    panel.grid.minor = element_blank()
+  )
+# Using a simple rule of 1.0 cases per 100 000 (7-day average) sustained for at least three days, the first five states with substantial COVID-19 activity were Washington, Louisiana, New York, New Jersey, and Guam.
+# Each panel shows a clear increase shortly after the dashed onset line, illustrating how quickly cases accelerated once community spread began.
+
+#Resources used: Tidyverse documentation for slice_max() and pivot_wider() functions, ggplot documentation for finding certain parameters, ChatGPT for debugging
