@@ -1,24 +1,48 @@
-##### Problem 1. #####
+---
+title: "Purtell_ProblemSet04"
+author: "Colin Purtell"
+format:
+  html: 
+    embed-resources: true
+    standalone: true
+editor: visual
+---
 
+## STATS 506 Problem Set 4:
+
+Link to repository: <https://github.com/cspurtell/stat506>
+
+### Problem 1
+
+```{r}
 library(tidyverse)
 library(nzelect)
 data("nzge")
-  
-### a. ###
+```
+
+#### a.
+
+```{r}
 nzge %>%
   group_by(election_year, voting_type) %>%
   summarize(total_votes = sum(votes, na.rm = TRUE)) %>%
   arrange(desc(total_votes))
+```
 
-### b. ###
+#### b.
+
+```{r}
 nzge %>%
   filter(election_year == 2014, voting_type == "Candidate") %>%
   group_by(party) %>% 
   summarize(total_votes = sum(votes, na.rm = TRUE)) %>% 
   mutate(percent = 100 * total_votes / sum(total_votes)) %>% 
   arrange(desc(percent))
+```
 
-### c. ###
+#### c.
+
+```{r}
 nzge %>% 
   group_by(election_year, voting_type, party) %>% 
   summarize(total_votes = sum(votes, na.rm = TRUE)) %>% 
@@ -28,34 +52,49 @@ nzge %>%
     values_from = party,
     names_prefix = "winner_"
   )
+```
 
-##### Problem 2. #####
+### Problem 2
+
+```{r}
 atp = read.csv("data/atp_matches_2019.csv")
+```
 
-### a. ###
+#### a.
+
+```{r}
 atp %>% 
   distinct(tourney_id, tourney_name) %>% 
   count()
-#The ATP dataset includes some tournaments that began in late 2018 but are part of the 2019 competitive season (for example, tournaments starting December 31, 2018). To handle this, I chose to include only tournaments that ended in 2019, reasoning that these were part of the 2019 season. Based on this filter, there were X tournaments in the 2019 season.
+```
 
-### b. ###
+The ATP dataset includes some tournaments that began in late 2018 but are part of the 2019 competitive season (for example, tournaments starting December 31, 2018). To handle this, I chose to include only tournaments that ended in 2019, reasoning that these were part of the 2019 season. Based on this filter, there were 128 tournaments in the 2019 season.
+
+#### b.
+
+```{r}
 tourney_winners = atp %>% 
   filter(round == "F") %>% 
   group_by(tourney_id, tourney_name) %>% 
   summarize(winner = first(winner_name), .groups = "drop")
+```
 
-#“For consistency, I defined a ‘tournament’ as any event with a recorded final match (round == "F"). This ensures the champion is identifiable. Using this criterion, 67 tournaments had a final recorded in 2019.”
+For consistency, I defined a ‘tournament’ as any event with a recorded final match (round == "F"). This ensures the champion is identifiable. Using this criterion, 67 tournaments had a final recorded in 2019.
 
+```{r}
 tourney_winners %>%
   count(winner, sort = TRUE)
 
 tourney_winners %>%
   count(winner, sort = TRUE) %>%
   filter(n > 1)
+```
 
-#We can see that 12 players won more than one tournament, with the most being 5 by Dominic Thiem and Novak Djokovic
+We can see that 12 players won more than one tournament, with the most being 5 by Dominic Thiem and Novak Djokovic.
 
-### c. ###
+#### c.
+
+```{r}
 aces_long <- atp %>%
   select(w_ace, l_ace) %>%
   rename(winner = w_ace, loser = l_ace) %>%
@@ -72,9 +111,11 @@ aces_long %>%
     sd_aces = sd(aces, na.rm = TRUE),
     n = n()
   )
+```
 
-#We can see from the observed mean and sd for each group of players that the mean number of aces for winners is higher than for losers
+We can see from the observed mean and sd for each group of players that the mean number of aces for winners is higher than for losers.
 
+```{r}
 aces_long %>%
   ggplot(aes(x = result, y = aces, fill = result)) +
   geom_boxplot() +
@@ -83,9 +124,13 @@ aces_long %>%
     x = "Result", y = "Number of Aces"
   ) +
   theme_minimal()
-#The boxplots support the hypothesis, as the IQR for winners is significantly higher than for losers and with less spread
+```
 
-### d. ###
+The boxplots support the hypothesis, as the box and IQR for winners is significantly higher than for losers and with less spread.
+
+#### d.
+
+```{r}
 player_stats <- atp %>%
   select(winner_name, loser_name) %>%
   pivot_longer(
@@ -107,19 +152,22 @@ player_summary <- player_stats %>%
 
 player_summary %>%
   filter(win_rate == max(win_rate))
+```
 
-#From the above filtering, we find that Rafael Nadal has the highest win rate of around 87%
+From the above filtering, we find that Rafael Nadal has the highest win rate of around 87%.
 
-##### Problem 3. #####
+### Problem 3
+
+```{r}
 usa <- read.csv("data/us-states.csv") %>% 
   mutate(date = as.Date(date))
+```
 
-### a. ###
-# Aggregate to national series by summing state 7-day averages each day. 
-# Define “spikes” based on simple relative thresholds from that series. A major spike can be 
-# when the 7-day average of new cases per 100k is greater than 75% of the overall maximum value seen in the dataset.
-# A minor spike can be when the 7-day average is between 40% and 75% of the maximum value.
+#### a.
 
+We aggregate to national series by summing state 7-day averages each day, and define “spikes” based on simple relative thresholds from that series. A major spike can be when the 7-day average of new cases per 100k is greater than 75% of the overall maximum value seen in the dataset. A minor spike can be when the 7-day average is between 40% and 75% of the maximum value.
+
+```{r}
 max_cases <- max(usa$cases_avg_per_100k, na.rm = TRUE)
 major_cutoff <- 0.75 * max_cases
 minor_cutoff <- 0.40 * max_cases
@@ -152,7 +200,11 @@ usa_spikes %>%
     plot.title.position = "plot",
     panel.grid.minor = element_blank()
   )
+```
 
+From the above visualization, we can clearly see that our criteria for major and minor spikes correctly captures both major and minor changes in COVID cases.
+
+```{r}
 spike_counts <- usa_spikes %>%
   mutate(
     is_spike = !is.na(spike_type),
@@ -169,12 +221,15 @@ spike_counts <- usa_spikes %>%
   summarise(n_spikes = n(), .groups = "drop")
 
 spike_counts
-#Using our definitions, we find 28 major spikes and 433 minor spikes
+```
 
-### b. ###
-#To keep it simple, we’ll use the average cases_avg_per_100k across the full dataset period for each state.
-#This reflects the typical per-capita infection rate.
+Using our definitions, we find 28 major spikes and 433 minor spikes.
 
+#### b.
+
+To keep it simple, we’ll use the average cases_avg_per_100k across the full dataset period for each state. This reflects the typical per-capita infection rate.
+
+```{r}
 state_rates <- usa %>%
   group_by(state) %>%
   summarise(mean_rate = mean(cases_avg_per_100k, na.rm = TRUE), .groups = "drop")
@@ -206,12 +261,15 @@ usa %>%
     plot.title.position = "plot",
     panel.grid.minor = element_blank()
   )
-#Both groups share the same broad pandemic timeline
-#Top and bottom groups differ dramatically in case magnitude
+```
 
-### c. ###
-#We can define when a state experiences COVID “in a substantial way” as when its 7-day average of new cases per 100k exceeds 1.0 for at least three consecutive days.
+The five highest states/territories are American Samoa, Rhode Island, Alaska, Kentucky, and North Dakota, while the five lowest are Maryland, Maine, Oregon, the Virgin Islands, and Vermont. We can see that both groups share the same broad pandemic timeline with spikes in the same areas. The top and bottom groups differ dramatically in case magnitude, and there are some increases in average cases observed in the top group that are not seen in the bottom group.
 
+#### c.
+
+We can define when a state experiences COVID “in a substantial way” as when its 7-day average of new cases per 100k exceeds 1.0 for at least three consecutive days.
+
+```{r}
 first_substantial <- usa %>%
   group_by(state) %>%
   arrange(date, .by_group = TRUE) %>%
@@ -257,7 +315,10 @@ ggplot(cov_plot, aes(x = date, y = cases_avg_per_100k, color = state)) +
     plot.title.position = "plot",
     panel.grid.minor = element_blank()
   )
-# Using a simple rule of 1.0 cases per 100 000 (7-day average) sustained for at least three days, the first five states with substantial COVID-19 activity were Washington, Louisiana, New York, New Jersey, and Guam.
-# Each panel shows a clear increase shortly after the dashed onset line, illustrating how quickly cases accelerated once community spread began.
+```
 
-#Resources used: Tidyverse documentation for slice_max() and pivot_wider() functions, ggplot documentation for finding certain parameters, ChatGPT for debugging
+Using a simple rule of 1.0 cases per 100 000 (7-day average) sustained for at least three days, the first five states with substantial COVID-19 activity were Washington, Louisiana, New York, New Jersey, and Guam. Each panel shows a clear increase shortly after the dashed onset line, illustrating how quickly cases accelerated once community spread began.
+
+#### Resources Used:
+
+Tidyverse documentation for slice_max() and pivot_wider() functions, ggplot documentation for finding certain parameters, ChatGPT for debugging.

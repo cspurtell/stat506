@@ -8,7 +8,7 @@ format:
 editor: visual
 ---
 
-## STATS 506 Problem Set 2:
+## STATS 506 Problem Set 3:
 
 Link to repository: <https://github.com/cspurtell/stat506>\
 
