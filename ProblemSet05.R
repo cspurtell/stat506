@@ -143,3 +143,103 @@ setReplaceMethod("sterr", "waldCI", function(x, value) {
 })
 
 # Contains method
+setGeneric("contains", function(object, value) standardGeneric("contains"))
+setMethod("contains", signature(object = "waldCI", value = "numeric"),
+          function(object, value) {
+            (value >= object@lb) & (value <= object@ub)
+          })
+
+# Overlap method
+setGeneric("overlap", function(x, y) standardGeneric("overlap"))
+setMethod("overlap", signature(x = "waldCI", y = "waldCI"),
+          function(x, y) {
+            max(lb(x), lb(y)) <= min(ub(x), ub(y))
+          })
+
+# as.numeric
+setMethod("as.numeric", "waldCI", function(x, ...) {
+  c(lb(x), ub(x))
+})
+
+# Transform method
+setGeneric("transformCI", function(ci, f) standardGeneric("transformCI"))
+setMethod("transformCI", signature(ci = "waldCI", f = "function"),
+          function(ci, f) {
+            # crude monotonicity check on [lb, mid, ub]
+            xs <- c(lb(ci), mean(ci), ub(ci))
+            ys <- sapply(xs, f)
+            
+            inc <- all(diff(ys) >= 0)
+            dec <- all(diff(ys) <= 0)
+            
+            if (!(inc || dec)) {
+              warning("transformCI: function does not appear monotonic on this interval; results may be meaningless.")
+            }
+            
+            # transform endpoints and reorder if needed
+            a <- f(lb(ci))
+            b <- f(ub(ci))
+            new_bounds <- sort(c(a, b))
+            
+            makeWaldCI(
+              level = level(ci),
+              lb    = new_bounds[1],
+              ub    = new_bounds[2]
+            )
+          })
+
+
+### b. ###
+ci1 <- makeWaldCI(level = 0.95, lb = 17.2, ub = 24.7)
+ci2 <- makeWaldCI(level = 0.99, mean = 13, sterr = 2.5)
+ci3 <- makeWaldCI(level = 0.75, lb = 27.43, ub = 39.22)
+
+ci1
+ci2
+ci3
+
+as.numeric(ci1)
+as.numeric(ci2)
+as.numeric(ci3)
+
+lb(ci2)
+ub(ci2)
+mean(ci1)
+sterr(ci3)
+level(ci2)
+
+lb(ci2) <- 10.5
+mean(ci3) <- 34
+level(ci3) <- .8
+
+contains(ci1, 17)
+contains(ci3, 44)
+overlap(ci1, ci2)
+
+eci1 <- transformCI(ci1, sqrt)
+eci1
+mean(transformCI(ci2, log))
+
+### c. ###
+# Negative standard error
+try(makeWaldCI(level = 0.95, mean = 10, sterr = -1))
+
+# lb > ub
+try(makeWaldCI(level = 0.95, lb = 5, ub = 2))
+
+# Infinite bounds
+try(makeWaldCI(level = 0.95, lb = -Inf, ub = 5))
+try(makeWaldCI(level = 0.95, lb = 0,   ub = Inf))
+
+# Invalid setters
+bad <- ci1
+try(lb(bad) <- 50)
+
+bad2 <- ci1
+try(level(bad2) <- 1.5)
+
+bad3 <- ci1
+try(sterr(bad3) <- -0.1)
+
+
+##### Problem 2. #####
