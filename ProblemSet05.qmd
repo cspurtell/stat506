@@ -1,0 +1,297 @@
+---
+title: "Purtell_ProblemSet04"
+author: "Colin Purtell"
+format:
+  html: 
+    embed-resources: true
+    standalone: true
+editor: visual
+---
+
+## STATS 506 Problem Set 4:
+
+Link to repository: <https://github.com/cspurtell/stat506>
+
+### Problem 1
+
+```{r}
+library(tidyverse)
+library(plotly)
+```
+
+#### a.
+
+Class definition:
+
+```{r}
+setClass(
+  Class = "waldCI",
+  slots = list(
+    lb = "numeric",
+    ub = "numeric",
+    level = "numeric"
+  )
+)
+```
+
+Validity function:
+
+```{r}
+setValidity("waldCI", function(object) {
+  msgs <- character()
+  if (length(object@lb) != 1) {
+    msgs <- c(msgs, "lb must be a numeric of length 1.")
+    }
+  if (length(object@ub) != 1) {
+    msgs <- c(msgs, "ub must be a numeric of length 1.")
+    }
+  if (length(object@level) != 1) {
+    msgs <- c(msgs, "level must be a numeric of length 1.")
+    }
+  if (is.na(object@lb) || is.na(object@ub) || is.na(object@level)) {
+    msgs <- c(msgs, "lb, ub, and level must not be NA.")
+    }
+  if (!is.finite(object@lb) || !is.finite(object@ub)) {
+    msgs <- c(msgs, "lb and ub must be finite.")
+    }
+  if (object@level <= 0 || object@level >= 1) {
+    msgs <- c(msgs, "level must be strictly between 0 and 1.")
+    }
+  if (object@lb >= object@ub) {
+    msgs <- c(msgs, "lb must be strictly less than ub.")
+    }
+  if (length(msgs) == 0) {
+    TRUE 
+    } else msgs
+})
+```
+
+Constructor:
+
+```{r}
+makeWaldCI <- function(level, mean = NULL, sterr = NULL, lb = NULL, ub = NULL) {
+  if (!is.null(mean) || !is.null(sterr)) {
+    if (!is.numeric(sterr) || length(sterr) != 1 || is.na(sterr) || sterr <= 0) {
+      stop("sterr must be a single positive number.")
+    }
+    
+    if (!is.numeric(mean) || length(mean) != 1 || is.na(mean)) {
+      stop("mean must be a single numeric value.")
+    }
+    
+    z <- qnorm((1 + level) / 2)
+    half_width <- z * sterr
+    lb <- mean - half_width
+    ub <- mean + half_width
+    
+  } else {
+    if (is.null(lb) || is.null(ub)) {
+      stop("You must supply either (mean, sterr) or (lb, ub).")
+    }
+  }
+  
+  obj <- new("waldCI", lb = lb, ub = ub, level = level)
+  validObject(obj)
+  obj
+}
+```
+
+Show method:
+
+```{r}
+setMethod("show", "waldCI", function(object) {
+  cat(sprintf(
+    "Wald CI (%.1f%%): [%.4f, %.4f]\n",
+    100 * object@level,
+    object@lb,
+    object@ub
+  ))
+})
+```
+
+Accessors:
+
+```{r}
+setGeneric("lb", function(x) standardGeneric("lb"))
+setMethod("lb", "waldCI", function(x) x@lb)
+
+setGeneric("ub", function(x) standardGeneric("ub"))
+setMethod("ub", "waldCI", function(x) x@ub)
+
+setGeneric("level", function(x) standardGeneric("level"))
+setMethod("level", "waldCI", function(x) x@level)
+
+setMethod("mean", "waldCI", function(x, ...) {
+  (x@lb + x@ub) / 2
+})
+
+setGeneric("sterr", function(x) standardGeneric("sterr"))
+setMethod("sterr", "waldCI", function(x) {
+  z <- qnorm((1 + x@level) / 2)
+  (x@ub - x@lb) / (2 * z)
+})
+```
+
+Setters:
+
+```{r}
+setGeneric("lb<-", function(x, value) standardGeneric("lb<-"))
+setReplaceMethod("lb", "waldCI", function(x, value) {
+  x@lb <- value
+  validObject(x)
+  x
+})
+
+setGeneric("ub<-", function(x, value) standardGeneric("ub<-"))
+setReplaceMethod("ub", "waldCI", function(x, value) {
+  x@ub <- value
+  validObject(x)
+  x
+})
+
+setGeneric("level<-", function(x, value) standardGeneric("level<-"))
+setReplaceMethod("level", "waldCI", function(x, value) {
+  x@level <- value
+  validObject(x)
+  x
+})
+
+setGeneric("mean<-", function(x, value) standardGeneric("mean<-"))
+setReplaceMethod("mean", "waldCI", function(x, value) {
+  se <- sterr(x)
+  z  <- qnorm((1 + x@level) / 2)
+  half_width <- z * se
+  x@lb <- value - half_width
+  x@ub <- value + half_width
+  validObject(x)
+  x
+})
+
+setGeneric("sterr<-", function(x, value) standardGeneric("sterr<-"))
+setReplaceMethod("sterr", "waldCI", function(x, value) {
+  if (value <= 0) stop("sterr must be positive.")
+  m  <- mean(x)
+  z  <- qnorm((1 + x@level) / 2)
+  half_width <- z * value
+  x@lb <- m - half_width
+  x@ub <- m + half_width
+  validObject(x)
+  x
+})
+```
+
+Contains method:
+
+```{r}
+setGeneric("contains", function(object, value) standardGeneric("contains"))
+setMethod("contains", signature(object = "waldCI", value = "numeric"),
+          function(object, value) {
+            (value >= object@lb) & (value <= object@ub)
+          })
+```
+
+Overlap method:
+
+```{r}
+setGeneric("overlap", function(x, y) standardGeneric("overlap"))
+setMethod("overlap", signature(x = "waldCI", y = "waldCI"),
+          function(x, y) {
+            max(lb(x), lb(y)) <= min(ub(x), ub(y))
+          })
+```
+
+as.numeric method:
+
+```{r}
+setMethod("as.numeric", "waldCI", function(x, ...) {
+  c(lb(x), ub(x))
+})
+```
+
+Monotonic transformation method:
+
+```{r}
+setGeneric("transformCI", function(ci, f) standardGeneric("transformCI"))
+setMethod("transformCI", signature(ci = "waldCI", f = "function"),
+          function(ci, f) {
+            # crude monotonicity check on [lb, mid, ub]
+            xs <- c(lb(ci), mean(ci), ub(ci))
+            ys <- sapply(xs, f)
+            
+            inc <- all(diff(ys) >= 0)
+            dec <- all(diff(ys) <= 0)
+            
+            if (!(inc || dec)) {
+              warning("transformCI: function does not appear monotonic on this interval; results may be meaningless.")
+            }
+            
+            # transform endpoints and reorder if needed
+            a <- f(lb(ci))
+            b <- f(ub(ci))
+            new_bounds <- sort(c(a, b))
+            
+            makeWaldCI(
+              level = level(ci),
+              lb    = new_bounds[1],
+              ub    = new_bounds[2]
+            )
+          })
+```
+
+#### b.
+
+Testing the constructor and parameters:
+
+```{r}
+ci1 <- makeWaldCI(level = 0.95, lb = 17.2, ub = 24.7)
+ci2 <- makeWaldCI(level = 0.99, mean = 13, sterr = 2.5)
+ci3 <- makeWaldCI(level = 0.75, lb = 27.43, ub = 39.22)
+
+ci1
+ci2
+ci3
+```
+
+Testing as.numeric:
+
+```{r}
+as.numeric(ci1)
+as.numeric(ci2)
+as.numeric(ci3)
+```
+
+Testing accessors:
+
+```{r}
+lb(ci2)
+ub(ci2)
+mean(ci1)
+sterr(ci3)
+level(ci2)
+```
+
+Testing setters:
+
+```{r}
+lb(ci2) <- 10.5
+mean(ci3) <- 34
+level(ci3) <- .8
+```
+
+Testing contains and overlap method:
+
+```{r}
+contains(ci1, 17)
+contains(ci3, 44)
+overlap(ci1, ci2)
+```
+
+Testing a monotonic transformation:
+
+```{r}
+eci1 <- transformCI(ci1, sqrt)
+eci1
+mean(transformCI(ci2, log))
+```
+
+#### c.
