@@ -1,3 +1,6 @@
+library(tidyverse)
+library(plotly)
+
 ##### Problem 1. #####
 
 ### a. ###
@@ -243,3 +246,237 @@ try(sterr(bad3) <- -0.1)
 
 
 ##### Problem 2. #####
+usa <- read.csv("data/us-states.csv") %>% 
+  mutate(date = as.Date(date))
+
+### a. ###
+max_cases <- max(usa$cases_avg_per_100k, na.rm = TRUE)
+major_cutoff <- 0.75 * max_cases
+minor_cutoff <- 0.40 * max_cases
+
+usa_spikes <- usa %>%
+  mutate(
+    spike_type = case_when(
+      cases_avg_per_100k >= major_cutoff ~ "Major spike",
+      cases_avg_per_100k >= minor_cutoff ~ "Minor spike",
+      TRUE ~ NA_character_
+    )
+  )
+
+p_a <- usa_spikes %>%
+  plot_ly(
+    x = ~date,
+    y = ~cases_avg_per_100k,
+    type = "scatter",
+    mode = "lines",
+    line = list(color = "rgba(100,100,100,0.8)"),
+    name = "7-day average"
+  ) %>%
+  # add points only where spike_type is not NA
+  add_markers(
+    data = subset(usa_spikes, !is.na(spike_type)),
+    x = ~date,
+    y = ~cases_avg_per_100k,
+    color = ~spike_type,
+    colors = c("firebrick", "goldenrod"),
+    marker = list(size = 6, opacity = 0.8),
+    name = ~spike_type
+  ) %>%
+  layout(
+    title = list(
+      text = paste0(
+        "U.S. COVID-19: Major and Minor Spikes (7-day average per 100k)",
+        "<br><sub>Major ≥ ", round(major_cutoff, 1),
+        " per 100k | Minor ≥ ", round(minor_cutoff, 1), "</sub>"
+      )
+    ),
+    xaxis = list(title = ""),
+    yaxis = list(title = "New cases per 100k (7-day avg)"),
+    legend = list(orientation = "h", x = 0, y = 1.1),
+    margin = list(t = 70),
+    annotations = list(
+      x = 1, y = -0.15, xref = "paper", yref = "paper",
+      text = "Source: NYTimes COVID-19 Rolling Averages",
+      showarrow = FALSE, xanchor = "right", yanchor = "auto"
+    )
+  )
+
+p_a
+
+spike_counts <- usa_spikes %>%
+  mutate(
+    is_spike = !is.na(spike_type),
+    group_id = cumsum(is.na(lag(spike_type)) & !is.na(spike_type))
+  ) %>%
+  filter(is_spike) %>%
+  group_by(spike_type, group_id) %>%
+  summarise(
+    start_date = min(date),
+    end_date = max(date),
+    .groups = "drop"
+  ) %>%
+  group_by(spike_type) %>%
+  summarise(n_spikes = n(), .groups = "drop")
+
+spike_counts
+
+### b. ###
+state_rates <- usa %>%
+  group_by(state) %>%
+  summarise(mean_rate = mean(cases_avg_per_100k, na.rm = TRUE), .groups = "drop")
+
+top_states <- state_rates %>% slice_max(mean_rate, n = 5) %>% pull(state)
+bottom_states <- state_rates %>% slice_min(mean_rate, n = 5) %>% pull(state)
+
+plot_data <- usa %>%
+  filter(state %in% c(top_states, bottom_states)) %>%
+  mutate(
+    category = case_when(
+      state %in% top_states ~ "Highest overall rate",
+      state %in% bottom_states ~ "Lowest overall rate"
+    )
+  )
+
+p_top <- plot_data %>%
+  filter(category == "Highest overall rate") %>%
+  plot_ly(
+    x = ~date,
+    y = ~cases_avg_per_100k,
+    color = ~state,
+    type = "scatter",
+    mode = "lines",
+    hovertemplate = paste(
+      "<b>%{color}</b><br>",
+      "%{x}<br>",
+      "Cases per 100k: %{y:.1f}<extra></extra>"
+    )
+  ) %>%
+  layout(
+    title = list(text = "Highest overall rate"),
+    xaxis = list(title = ""),
+    yaxis = list(title = "Cases per 100k (7-day avg)")
+  )
+
+p_bottom <- plot_data %>%
+  filter(category == "Lowest overall rate") %>%
+  plot_ly(
+    x = ~date,
+    y = ~cases_avg_per_100k,
+    color = ~state,
+    type = "scatter",
+    mode = "lines",
+    showlegend = FALSE,  # share legend from top
+    hovertemplate = paste(
+      "<b>%{color}</b><br>",
+      "%{x}<br>",
+      "Cases per 100k: %{y:.1f}<extra></extra>"
+    )
+  ) %>%
+  layout(
+    title = list(text = "Lowest overall rate"),
+    xaxis = list(title = ""),
+    yaxis = list(title = "Cases per 100k (7-day avg)")
+  )
+
+p_b <- subplot(
+  p_top, p_bottom,
+  nrows = 2,
+  shareX = TRUE,
+  titleY = TRUE,
+  margin = 0.07
+) %>%
+  layout(
+    title = list(
+      text = paste0(
+        "COVID-19 Trajectories: States with Highest and Lowest Average Case Rates",
+        "<br><sub>7-day rolling average new cases per 100k (Top 5 vs. Bottom 5 states)</sub>"
+      )
+    ),
+    legend = list(orientation = "h", x = 0, y = 1.15),
+    annotations = list(
+      x = 1, y = -0.12, xref = "paper", yref = "paper",
+      text = "Source: NYTimes COVID-19 Rolling Averages",
+      showarrow = FALSE, xanchor = "right"
+    ),
+    margin = list(t = 80)
+  )
+
+p_b
+
+### c. ###
+first_substantial <- usa %>%
+  group_by(state) %>%
+  arrange(date, .by_group = TRUE) %>%
+  mutate(
+    above = cases_avg_per_100k >= 1.0,
+    run = ave(above, cumsum(!above), FUN = seq_along)
+  ) %>%
+  filter(above & run >= 3) %>%
+  summarise(first_date = min(date), .groups = "drop") %>%
+  arrange(first_date)
+
+first_five <- head(first_substantial, 5)
+
+cov_plot <- usa %>%
+  inner_join(first_five, by = "state") %>%
+  filter(date >= first_date & date <= first_date + 60)
+
+onset_lines <- first_five %>%
+  mutate(first_date = as.Date(first_date))
+
+states_order <- onset_lines$state
+
+plots_list <- lapply(states_order, function(st) {
+  dat <- cov_plot %>% filter(state == st)
+  fd  <- onset_lines$first_date[onset_lines$state == st]
+  max_y <- max(dat$cases_avg_per_100k, na.rm = TRUE)
+  
+  plot_ly(
+    data = dat,
+    x = ~date,
+    y = ~cases_avg_per_100k,
+    type = "scatter",
+    mode = "lines",
+    name = st,
+    showlegend = FALSE
+  ) %>%
+    add_segments(
+      x = fd, xend = fd,
+      y = 0, yend = max_y,
+      line = list(color = "rgba(80,80,80,0.9)", dash = "dash"),
+      inherit = FALSE,
+      showlegend = FALSE
+    ) %>%
+    layout(
+      title = list(text = st),
+      xaxis = list(title = ""),
+      yaxis = list(title = "Cases per 100k (7-day avg)")
+    )
+})
+
+p_c <- subplot(
+  plots_list,
+  nrows = 2,  # 2 rows x 3 cols (last cell empty) or 1x5, tweak as needed
+  margin = 0.05,
+  shareX = FALSE,
+  shareY = FALSE,
+  titleY = TRUE
+) %>%
+  layout(
+    title = list(
+      text = paste0(
+        "Earliest Substantial COVID Activity by State",
+        "<br><sub>First 5 states to exceed 1.0 cases per 100k (7-day avg) for 3+ consecutive days</sub>"
+      )
+    ),
+    annotations = list(
+      x = 1, y = -0.1, xref = "paper", yref = "paper",
+      text = "Source: NYTimes COVID-19 Rolling Averages",
+      showarrow = FALSE, xanchor = "right"
+    ),
+    margin = list(t = 80)
+  )
+
+p_c
+
+#Resources used: Plotly documentation, setGeneric and setMethod documentation, ChatGPT for debugging purposes
