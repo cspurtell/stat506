@@ -82,7 +82,7 @@ setValidity("bootstrapWaldCI", function(object) {
   reps    <- as.integer(reps)
   n <- nrow(data)
   
-  one_boot <- function() {
+  one_boot <- function(i) {
     idx <- sample.int(n, n, replace = TRUE)
     
     if (is.null(dim(data))) {
@@ -117,4 +117,105 @@ makeBootstrapCI <- function(FUN,
   bootStats <- .runBootstrap(FUN, data, reps, compute)
   boot_mean <- mean(bootStats)
   boot_se <- sd(bootStats)
+  
+  parent_ci <- makeWaldCI(
+    level = level,
+    mean = boot_mean,
+    sterr = boot_se
+  )
+  
+  obj <- new(
+    "bootstrapWaldCI",
+    lb = lb(parent_ci),
+    ub = ub(parent_ci),
+    level = level(parent_ci),
+    fun = FUN,
+    data = data,
+    reps = reps,
+    compute = compute,
+    bootStats = bootStats
+  )
+  
+  validObject(obj)
+  obj
 }
+
+setGeneric("rebootstrap", function(object) standardGeneric("rebootstrap"))
+setMethod("rebootstrap", "bootstrapWaldCI", function(object) {
+  FUN <- object@fun
+  data <- object@data
+  reps    <- object@reps
+  level   <- object@level
+  compute <- object@compute
+  
+  bootStats <- .runBootstrap(FUN, data, reps, compute)
+  boot_mean <- mean(bootStats)
+  boot_se   <- sd(bootStats)
+  z         <- qnorm((1 + level) / 2)
+  half_w    <- z * boot_se
+  
+  object@lb        <- boot_mean - half_w
+  object@ub        <- boot_mean + half_w
+  object@bootStats <- bootStats
+  
+  validObject(object)
+  object
+})
+
+### b. ###
+ci1 <- makeBootstrapCI(function(x) mean(x$y),
+                       ggplot2::diamonds,
+                       reps = 1000)
+ci1
+rebootstrap(ci1)
+
+#Time comparison
+t_serial <- system.time({
+  ci_serial <- makeBootstrapCI(function(x) mean(x$y), 
+                               ggplot2::diamonds, 
+                               reps = 3000, 
+                               compute = "serial")
+})
+t_serial
+
+t_parallel <- system.time({
+  ci_parallel <- makeBootstrapCI(function(x) mean(x$y), 
+                                 ggplot2::diamonds, 
+                                 reps = 3000, 
+                                 compute = "parallel")
+})
+t_parallel
+
+### c. ###
+dispCoef <- function(data) {
+  fit <- lm(mpg ~ cyl + disp + wt, data = data)
+  unname(coef(fit)["disp"])
+}
+
+ci2 <- makeBootstrapCI(dispCoef,
+                       mtcars,
+                       reps = 1000)
+ci2
+rebootstrap(ci2)
+
+t_serial <- system.time({
+  ci_serial <- makeBootstrapCI(dispCoef,
+                         mtcars,
+                         reps = 3000,
+                         compute = "serial")
+})
+t_serial
+
+t_parallel <- system.time({
+  ci_parallel <- makeBootstrapCI(dispCoef,
+                               mtcars,
+                               reps = 3000,
+                               compute = "parallel")
+})
+t_parallel
+
+##### Problem 3. #####
+
+
+
+#Resources used: R documentation for unname() function and bootstrapping assistance, ChatGPT for debugging
