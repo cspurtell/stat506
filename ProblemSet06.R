@@ -2,6 +2,10 @@ library(Rcpp)
 library(e1071)
 library(microbenchmark)
 library(parallel)
+library(dplyr)
+library(lme4)
+library(purrr)
+library(ggplot2)
 
 ##### Problem 1. #####
 cppFunction('
@@ -215,6 +219,40 @@ t_parallel <- system.time({
 t_parallel
 
 ##### Problem 3. #####
+source("ps06q3.R")
+
+### a. ###
+df_std <- df %>%
+  group_by(country) %>%
+  mutate(
+    prior_gpa_z = scale(prior_gpa)[,1],
+    forum_posts_z = scale(forum_posts)[,1],
+    quiz_attempts_z = scale(quiz_attempts)[,1],
+  ) %>% 
+  ungroup()
+
+df_by_country <- split(df_std, df_std$country)
+fit_country_model <- function(data) {
+  glmer(
+    completed_course ~ prior_gpa_z + forum_posts_z + quiz_attempts_z + (1 | device_type),
+    data = data,
+    family = binomial,
+    control = glmerControl(optimizer = "bobyqa")
+  )
+}
+models <- map(df_by_country, fit_country_model)
+
+coef_df <- map_df(
+  names(models),
+  ~ {
+    m <- models[[.x]]
+    tibble(
+      country = .x,
+      est = fixef(m)["forum_posts_z"],
+      se = sqrt(diag(vcov(m)))["forum_posts_z"]
+    )
+  }
+)
 
 
 
