@@ -3,7 +3,7 @@
 library(tidyverse)
 library(nzelect)
 data("nzge")
-  
+
 ### a. ###
 nzge %>%
   group_by(election_year, voting_type) %>%

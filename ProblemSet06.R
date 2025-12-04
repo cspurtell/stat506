@@ -6,6 +6,7 @@ library(dplyr)
 library(lme4)
 library(purrr)
 library(ggplot2)
+library(data.table)
 
 ##### Problem 1. #####
 cppFunction('
@@ -356,8 +357,83 @@ t_fast
 coef_fast
 
 ##### Problem 4. #####
+atp = fread("data/atp_matches_2019.csv")
 
+### a. ###
+tournaments <- unique(atp[, .(tourney_id, tourney_name)])
+tournaments[]
+tournaments[, .N]
 
+#The ATP dataset includes some tournaments that began in late 2018 but are part of the 2019 competitive season (for example, tournaments starting December 31, 2018). To handle this, I chose to include only tournaments that ended in 2019, reasoning that these were part of the 2019 season. Based on this filter, there were 128 tournaments in the 2019 season.
 
+### b. ###
+tourney_winners <- atp[
+  round == "F",
+  .(winner = first(winner_name)),
+  by = .(tourney_id, tourney_name)
+]
 
-#Resources used: R documentation for unname() function and bootstrapping assistance, ChatGPT for debugging
+#“For consistency, I defined a ‘tournament’ as any event with a recorded final match (round == "F"). This ensures the champion is identifiable. Using this criterion, 67 tournaments had a final recorded in 2019.”
+
+winner_counts <- tourney_winners[, .N, by = winner][order(-N)]
+multi_winners <- winner_counts[N > 1]
+multi_winners[]
+
+#We can see that 12 players won more than one tournament, with the most being 5 by Dominic Thiem and Novak Djokovic
+
+### c. ###
+aces_long <- melt(
+  atp,
+  measure.vars  = c("w_ace", "l_ace"),
+  variable.name = "result",
+  value.name    = "aces"
+)
+aces_long[, result := ifelse(result == "w_ace", "winner", "loser")]
+aces_long <- aces_long[!is.na(aces)]
+
+aces_summary <- aces_long[
+  , .(
+    mean_aces   = mean(aces),
+    median_aces = median(aces),
+    sd_aces     = sd(aces),
+    n           = .N
+  ),
+  by = result
+]
+
+aces_summary
+
+ggplot(aces_long, aes(x = result, y = aces, fill = result)) +
+  geom_boxplot() +
+  labs(
+    title = "Aces by Match Result (Winner vs. Loser)",
+    x = "Result",
+    y = "Number of Aces"
+  ) +
+  theme_minimal()
+
+#We can see from the observed mean and sd for each group of players that the mean number of aces for winners is higher than for losers. The box plots support the hypothesis, as the IQR for winners is significantly higher than for losers and with less spread.
+
+### d. ###
+player_stats <- melt(
+  atp,
+  measure.vars  = c("winner_name", "loser_name"),
+  variable.name = "result",
+  value.name    = "player"
+)
+player_stats[, win := as.integer(result == "winner_name")]
+
+player_summary <- player_stats[
+  , .(
+    matches  = .N,
+    wins     = sum(win),
+    win_rate = sum(win) / .N
+  ),
+  by = player
+][matches >= 5][order(-win_rate)]
+
+player_summary[win_rate == max(win_rate)]
+
+#From the above filtering, we find that Rafael Nadal has the highest win rate of around 87%
+
+#Resources used: R documentation for unname() function and bootstrapping assistance, data.table library documentation for Problem 4 (especially melt), ChatGPT for debugging
