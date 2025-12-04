@@ -254,6 +254,110 @@ coef_df <- map_df(
   }
 )
 
+coef_df %>%
+  mutate(
+    lower = est - 1.96 * se,
+    upper = est + 1.96 * se
+  ) %>%
+  ggplot(aes(x = est, y = country)) +
+  geom_point(size = 3, color = "steelblue") +
+  geom_errorbarh(aes(xmin = lower, xmax = upper), height = 0.2) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  labs(
+    title = "Estimated Effect of Forum Posts on Course Completion",
+    x = "Coefficient (log-odds scale)",
+    y = "Country"
+  ) +
+  theme_minimal(base_size = 14)
+
+model_times <- data.frame(
+  country = names(df_by_country),
+  user = NA_real_,
+  system = NA_real_,
+  elapsed = NA_real_,
+  stringsAsFactors = FALSE
+)
+
+models <- list()
+for (i in seq_along(df_by_country)) {
+  country_name <- names(df_by_country)[i]
+  dat <- df_by_country[[i]]
+  
+  t <- system.time({
+    m <- fit_country_model(dat)
+  })
+  
+  models[[country_name]] <- m
+  model_times$user[i]    <- t[["user.self"]]
+  model_times$system[i]  <- t[["sys.self"]]
+  model_times$elapsed[i] <- t[["elapsed"]]
+}
+
+print(model_times)
+
+### b. ###
+t_fast <- system.time({
+  df_std <- df %>%
+    group_by(country) %>%
+    mutate(
+      prior_gpa_z     = as.numeric(scale(prior_gpa)),
+      forum_posts_z   = as.numeric(scale(forum_posts)),
+      quiz_attempts_z = as.numeric(scale(quiz_attempts))
+    ) %>%
+    ungroup()
+  
+  df_by_country <- split(df_std, df_std$country)
+  
+  fit_and_extract <- function(dat) {
+    m <- glmer(
+      completed_course ~ prior_gpa_z + forum_posts_z + quiz_attempts_z +
+        (1 | device_type),
+      data = dat,
+      family = binomial,
+      control = glmerControl(optimizer = "bobyqa")
+    )
+    
+    cf   <- fixef(m)
+    est  <- unname(cf["forum_posts_z"])
+    se   <- sqrt(diag(vcov(m)))["forum_posts_z"]
+    
+    list(est = est, se = se)
+  }
+  
+  num_cores <- max(1, detectCores() %/% 2)
+  cl <- makeCluster(num_cores)
+  on.exit(stopCluster(cl), add = TRUE)
+  clusterEvalQ(cl, { library(lme4); NULL })
+  
+  clusterExport(
+    cl,
+    varlist = c("df_by_country", "fit_and_extract"),
+    envir = environment()
+  )
+  
+  countries <- names(df_by_country)
+  
+  res_list <- parLapply(cl, countries, function(ctry) {
+    dat <- df_by_country[[ctry]]
+    out <- fit_and_extract(dat)
+    data.frame(
+      country = ctry,
+      est     = out$est,
+      se      = out$se,
+      stringsAsFactors = FALSE
+    )
+  })
+  
+  coef_fast <- do.call(rbind, res_list)
+  coef_fast <- coef_fast[order(coef_fast$country), ]
+})
+
+t_fast
+coef_fast
+
+##### Problem 4. #####
+
+
 
 
 #Resources used: R documentation for unname() function and bootstrapping assistance, ChatGPT for debugging
