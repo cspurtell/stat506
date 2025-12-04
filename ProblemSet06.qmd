@@ -1,3 +1,18 @@
+---
+title: "Purtell_ProblemSet06"
+author: "Colin Purtell"
+format:
+  html: 
+    embed-resources: true
+    standalone: true
+editor: visual
+---
+
+## STATS 506 Problem Set 06
+
+Link to repository: <https://github.com/cspurtell/stat506>
+
+```{r}
 library(Rcpp)
 library(e1071)
 library(microbenchmark)
@@ -7,8 +22,13 @@ library(lme4)
 library(purrr)
 library(ggplot2)
 library(data.table)
+```
 
-##### Problem 1. #####
+### Problem 1
+
+Function definition:
+
+```{r}
 cppFunction('
 double C_moment(NumericVector v, int k) {
   int n = v.size();
@@ -33,26 +53,38 @@ double C_moment(NumericVector v, int k) {
   
   return acc / n;
 }')
+```
 
+Testing and comparing to e1071's *moment* function:
+
+```{r}
 set.seed(123)
 x <- rnorm(100)
 k <- 3
 
 C_moment(x, k)
-# 0.04532669
 moment(x, order = k, center = TRUE, absolute = FALSE)
-# 0.04532669
+```
 
+```{r}
 microbenchmark(
   C_moment(x, k),
   moment(x, order = k, center = TRUE, absolute = FALSE),
   times = 50
 )
+```
 
-##### Problem 2. #####
+### Problem 2
+
+```{r}
 source("ProblemSet05.R")
+```
 
-#Definition
+#### a.
+
+Class definition:
+
+```{r}
 setClass(
   Class = "bootstrapWaldCI",
   contains = "waldCI",
@@ -64,8 +96,11 @@ setClass(
     bootStats = "numeric"
   )
 )
+```
 
-# Validity function
+Validity function:
+
+```{r}
 setValidity("bootstrapWaldCI", function(object) {
   msgs <- character()
   if (length(object@reps) != 1 || object@reps <= 0) {
@@ -79,8 +114,11 @@ setValidity("bootstrapWaldCI", function(object) {
   }
   if (length(msgs) == 0) TRUE else msgs
 })
+```
 
-#Helper function
+Helper function (implemented in constructor and rebootstrap):
+
+```{r}
 #' Internal bootstrap helper
 #'
 #' Runs a nonparametric bootstrap on a statistic function, either in serial
@@ -122,8 +160,11 @@ setValidity("bootstrapWaldCI", function(object) {
   
   as.numeric(stats)
 }
+```
 
-#Constructor
+Constructor:
+
+```{r}
 #' Construct a bootstrap-based Wald confidence interval
 #'
 #' @description
@@ -179,7 +220,11 @@ makeBootstrapCI <- function(FUN,
   validObject(obj)
   obj
 }
+```
 
+*rebootstrap* function:
+
+```{r}
 #' Re-run a bootstrap for a bootstrapWaldCI object
 #'
 #' @description
@@ -212,15 +257,24 @@ setMethod("rebootstrap", "bootstrapWaldCI", function(object) {
   validObject(object)
   object
 })
+```
 
-### b. ###
+#### b.
+
+```{r}
 ci1 <- makeBootstrapCI(function(x) mean(x$y),
                        ggplot2::diamonds,
                        reps = 1000)
 ci1
-rebootstrap(ci1)
+```
 
-#Time comparison
+```{r}
+rebootstrap(ci1)
+```
+
+Performance comparison between serial and parallel compute methods:
+
+```{r}
 t_serial <- system.time({
   ci_serial <- makeBootstrapCI(function(x) mean(x$y), 
                                ggplot2::diamonds, 
@@ -236,8 +290,11 @@ t_parallel <- system.time({
                                  compute = "parallel")
 })
 t_parallel
+```
 
-### c. ###
+#### c.
+
+```{r}
 #' Extract the coefficient of disp from a linear model
 #'
 #' @description
@@ -253,13 +310,22 @@ dispCoef <- function(data) {
   fit <- lm(mpg ~ cyl + disp + wt, data = data)
   unname(coef(fit)["disp"])
 }
+```
 
+```{r}
 ci2 <- makeBootstrapCI(dispCoef,
                        mtcars,
                        reps = 1000)
 ci2
-rebootstrap(ci2)
+```
 
+```{r}
+rebootstrap(ci2)
+```
+
+Performance comparison between serial and parallel compute methods:
+
+```{r}
 t_serial <- system.time({
   ci_serial <- makeBootstrapCI(dispCoef,
                          mtcars,
@@ -275,11 +341,19 @@ t_parallel <- system.time({
                                compute = "parallel")
 })
 t_parallel
+```
 
-##### Problem 3. #####
+### Problem 3
+
+```{r}
 source("ps06q3.R")
+```
 
-### a. ###
+#### a.
+
+Model generation:
+
+```{r}
 df_std <- df %>%
   group_by(country) %>%
   mutate(
@@ -313,7 +387,11 @@ fit_country_model <- function(data) {
   )
 }
 models <- map(df_by_country, fit_country_model)
+```
 
+Plotting the estimates coefficients:
+
+```{r}
 coef_df <- map_df(
   names(models),
   ~ {
@@ -341,7 +419,11 @@ coef_df %>%
     y = "Country"
   ) +
   theme_minimal(base_size = 14)
+```
 
+Recalculating the models while determining the run times for each:
+
+```{r}
 model_times <- data.frame(
   country = names(df_by_country),
   user = NA_real_,
@@ -366,8 +448,13 @@ for (i in seq_along(df_by_country)) {
 }
 
 print(model_times)
+```
 
-### b. ###
+Insert analysis here
+
+#### b.
+
+```{r}
 t_fast <- system.time({
   df_std <- df %>%
     group_by(country) %>%
@@ -435,36 +522,60 @@ t_fast <- system.time({
   coef_fast <- do.call(rbind, res_list)
   coef_fast <- coef_fast[order(coef_fast$country), ]
 })
+```
 
+```{r}
 t_fast
+```
+
+```{r}
+coef_df
+```
+
+```{r}
 coef_fast
+```
 
-##### Problem 4. #####
+We can observe from the above tables that the estimated coefficients using the optimized script are the same as those found in part (a)
+
+### Problem 4
+
+```{r}
 atp = fread("data/atp_matches_2019.csv")
+```
 
-### a. ###
+#### a.
+
+```{r}
 tournaments <- unique(atp[, .(tourney_id, tourney_name)])
-tournaments[]
 tournaments[, .N]
+```
 
-#The ATP dataset includes some tournaments that began in late 2018 but are part of the 2019 competitive season (for example, tournaments starting December 31, 2018). To handle this, I chose to include only tournaments that ended in 2019, reasoning that these were part of the 2019 season. Based on this filter, there were 128 tournaments in the 2019 season.
+The ATP dataset includes some tournaments that began in late 2018 but are part of the 2019 competitive season (for example, tournaments starting December 31, 2018). To handle this, I chose to include only tournaments that ended in 2019, reasoning that these were part of the 2019 season. Based on this filter, there were 128 tournaments in the 2019 season.
 
-### b. ###
+#### b.
+
+```{r}
 tourney_winners <- atp[
   round == "F",
   .(winner = first(winner_name)),
   by = .(tourney_id, tourney_name)
 ]
+```
 
-#“For consistency, I defined a ‘tournament’ as any event with a recorded final match (round == "F"). This ensures the champion is identifiable. Using this criterion, 67 tournaments had a final recorded in 2019.”
+For consistency, I defined a ‘tournament’ as any event with a recorded final match (round == "F"). This ensures the champion is identifiable. Using this criterion, 67 tournaments had a final recorded in 2019.
 
+```{r}
 winner_counts <- tourney_winners[, .N, by = winner][order(-N)]
 multi_winners <- winner_counts[N > 1]
 multi_winners[]
+```
 
-#We can see that 12 players won more than one tournament, with the most being 5 by Dominic Thiem and Novak Djokovic
+We can see that 12 players won more than one tournament, with the most being 5 by Dominic Thiem and Novak Djokovic.
 
-### c. ###
+#### c.
+
+```{r}
 aces_long <- melt(
   atp,
   measure.vars  = c("w_ace", "l_ace"),
@@ -485,7 +596,11 @@ aces_summary <- aces_long[
 ]
 
 aces_summary
+```
 
+We can see from the observed mean and sd for each group of players that the mean number of aces for winners is higher than for losers.
+
+```{r}
 ggplot(aces_long, aes(x = result, y = aces, fill = result)) +
   geom_boxplot() +
   labs(
@@ -494,10 +609,13 @@ ggplot(aces_long, aes(x = result, y = aces, fill = result)) +
     y = "Number of Aces"
   ) +
   theme_minimal()
+```
 
-#We can see from the observed mean and sd for each group of players that the mean number of aces for winners is higher than for losers. The box plots support the hypothesis, as the IQR for winners is significantly higher than for losers and with less spread.
+The box plots support the hypothesis, as the box and IQR for winners is significantly higher than for losers and with less spread.
 
-### d. ###
+#### d.
+
+```{r}
 player_stats <- melt(
   atp,
   measure.vars  = c("winner_name", "loser_name"),
@@ -516,7 +634,10 @@ player_summary <- player_stats[
 ][matches >= 5][order(-win_rate)]
 
 player_summary[win_rate == max(win_rate)]
+```
 
-#From the above filtering, we find that Rafael Nadal has the highest win rate of around 87%
+From the above filtering, we find that Rafael Nadal has the highest win rate of around 87%.
 
-#Resources used: R documentation for unname() function and bootstrapping assistance, data.table library documentation for Problem 4 (especially melt), ChatGPT for debugging and roxygen assistance
+#### Resources Used:
+
+R documentation for unname() function and bootstrapping assistance, data.table library documentation for Problem 4 (especially melt), ChatGPT for debugging and roxygen assistance
