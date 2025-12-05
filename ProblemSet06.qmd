@@ -292,6 +292,8 @@ t_parallel <- system.time({
 t_parallel
 ```
 
+To compare serial and parallel computation, I ran 3,000 bootstrap replications using both methods. The serial run took 35.72 seconds of elapsed time, while the parallel version took 35.75 seconds. Although the parallel implementation dramatically reduced the user CPU time (0.14 seconds vs. 33.85 seconds), the elapsed times were nearly identical.
+
 #### c.
 
 ```{r}
@@ -342,6 +344,8 @@ t_parallel <- system.time({
 })
 t_parallel
 ```
+
+When bootstrapping the dispCoef statistic, the serial implementation required 4.61 seconds of elapsed time, while the parallel version completed in 3.02 seconds. Unlike the earlier example that bootstrapped a simple mean, this statistic requires fitting a linear regression model (lm) for each bootstrap replicate, which is a more computationally expensive operation. Therefore, parallelization is able to provide a meaningful speed improvement.
 
 ### Problem 3
 
@@ -449,8 +453,6 @@ for (i in seq_along(df_by_country)) {
 
 print(model_times)
 ```
-
-Insert analysis here
 
 #### b.
 
